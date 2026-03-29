@@ -4,6 +4,20 @@ import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2
 const CAT_EMOJI = { laitier:"🥛", cereale:"🌾", viande:"🥩", poisson:"🐟", legume:"🥬", fruit:"🍎", noix:"🥜", epice:"🧂", additif:"🧪", legumineuse:"🫘", oeuf:"🥚", sucre:"🍯", graisse:"🫒", autre:"📦" };
 const CAT_LABEL = { laitier:"Produits laitiers", cereale:"Céréales & Gluten", viande:"Viandes", poisson:"Poissons", legume:"Légumes", fruit:"Fruits", noix:"Noix & Graines", epice:"Épices & Condiments", additif:"Additifs", legumineuse:"Légumineuses", oeuf:"Œufs", sucre:"Sucres", graisse:"Huiles & Graisses", autre:"Autres" };
 const PAIN_LEVELS = [{ v:1, emoji:"😐", label:"Léger", color:"#FFE082" }, { v:2, emoji:"😣", label:"Moyen", color:"#FFB74D" }, { v:3, emoji:"🤢", label:"Fort", color:"#EF9A9A" }];
+const SYMPTOM_TYPES = [
+  { key:"abdominal_pain", emoji:"😣", label:"Douleur abdominale" },
+  { key:"gas",            emoji:"💨", label:"Gaz / flatulences" },
+  { key:"bloating",       emoji:"🎈", label:"Ballonnement" },
+  { key:"nausea",         emoji:"🤢", label:"Nausée / vomissement" },
+  { key:"fatigue",        emoji:"😴", label:"Fatigue" },
+  { key:"heartburn",      emoji:"🔥", label:"Brûlures / reflux" },
+  { key:"diarrhea",       emoji:"💧", label:"Diarrhée" },
+  { key:"discomfort",     emoji:"😕", label:"Inconfort abdominal" },
+  { key:"belching",       emoji:"🫧", label:"Éructations" },
+  { key:"headache",       emoji:"🤕", label:"Maux de tête" },
+  { key:"constipation",   emoji:"🧱", label:"Constipation" },
+  { key:"psych_distress", emoji:"😰", label:"Stress / détresse" },
+];
 const STORAGE_KEY = "mieuxdemain-entries";
 const APIKEY_KEY = "mieuxdemain-apikey";
 const LOOKBACK_HOURS = 24;
@@ -86,9 +100,10 @@ function computeSuspects(entries) {
 }
 
 function exportCSV(entries) {
-  const header = "Date,Heure,Type,Source,Plats,Ingrédients,Catégories,Additifs,Allergènes,Intensité,Transcript,Produit,Code-barres\n";
+  const header = "Date,Heure,Type,Symptôme,Source,Plats,Ingrédients,Catégories,Additifs,Allergènes,Intensité,Transcript,Produit,Code-barres\n";
   const rows = [...entries].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)).map(e => {
-    return `"${fmtDateShort(e.timestamp)}","${fmtTime(e.timestamp)}","${e.type==="pain"?"Douleur":"Repas"}","${e.source||""}","${(e.dishes||[]).join(" + ")}","${(e.ingredients||[]).map(i=>i.nom).join(", ")}","${[...new Set((e.ingredients||[]).map(i=>CAT_LABEL[i.categorie]||i.categorie))].join(", ")}","${(e.additives||[]).join(", ")}","${(e.allergens||[]).join(", ")}","${e.type==="pain"?(PAIN_LEVELS.find(p=>p.v===e.intensity)?.label||""):""}","${(e.transcript||"").replace(/"/g,'""')}","${e.product_name||""}","${e.barcode||""}"`;
+    const symptomLabel = e.type==="pain" ? (SYMPTOM_TYPES.find(s=>s.key===(e.symptom||"abdominal_pain"))?.label||"") : "";
+    return `"${fmtDateShort(e.timestamp)}","${fmtTime(e.timestamp)}","${e.type==="pain"?"Douleur":"Repas"}","${symptomLabel}","${e.source||""}","${(e.dishes||[]).join(" + ")}","${(e.ingredients||[]).map(i=>i.nom).join(", ")}","${[...new Set((e.ingredients||[]).map(i=>CAT_LABEL[i.categorie]||i.categorie))].join(", ")}","${(e.additives||[]).join(", ")}","${(e.allergens||[]).join(", ")}","${e.type==="pain"?(PAIN_LEVELS.find(p=>p.v===e.intensity)?.label||""):""}","${(e.transcript||"").replace(/"/g,'""')}","${e.product_name||""}","${e.barcode||""}"`;
   }).join("\n");
   const blob = new Blob(["\uFEFF" + header + rows], { type: "text/csv;charset=utf-8;" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -116,9 +131,9 @@ function EntryCard({ entry, onDelete, onEdit }) {
     <div className={`gf-card ${isPain ? "gf-card-pain" : ""}`}>
       <div className="gf-card-header" onClick={() => setOpen(!open)}>
         <div className="gf-card-left">
-          <span style={{fontSize:20,flexShrink:0}}>{isPain ? PAIN_LEVELS.find(p=>p.v===entry.intensity)?.emoji||"😣" : entry.source==="barcode"?"📦":"🍽️"}</span>
+          <span style={{fontSize:20,flexShrink:0}}>{isPain ? SYMPTOM_TYPES.find(s=>s.key===(entry.symptom||"abdominal_pain"))?.emoji||"😣" : entry.source==="barcode"?"📦":"🍽️"}</span>
           <div style={{minWidth:0}}>
-            <p className="gf-card-title">{isPain ? `Douleur – ${PAIN_LEVELS.find(p=>p.v===entry.intensity)?.label||"?"}` : (entry.dishes?.join(", ")||entry.product_name||entry.transcript?.slice(0,40)||"Repas")}</p>
+            <p className="gf-card-title">{isPain ? (() => { const st = SYMPTOM_TYPES.find(s=>s.key===(entry.symptom||"abdominal_pain")); const pl = PAIN_LEVELS.find(p=>p.v===entry.intensity); return `${st?.emoji||"😣"} ${st?.label||"Douleur"} – ${pl?.label||"?"}`;})() : (entry.dishes?.join(", ")||entry.product_name||entry.transcript?.slice(0,40)||"Repas")}</p>
             <p style={{fontSize:11,color:"#8D99AE",marginTop:2}}>{fmtTime(entry.timestamp)}{entry.source==="barcode"?" · scan":entry.source==="voice"?" · vocal":""}</p>
           </div>
         </div>
@@ -177,6 +192,9 @@ export default function MieuxDemain() {
   const [barcodeLoading, setBarcodeLoading] = useState(false);
   const [productResult, setProductResult] = useState(null);
   const [showPainModal, setShowPainModal] = useState(false);
+  const [painStep, setPainStep] = useState("symptom"); // "symptom" | "intensity"
+  const [pendingSymptom, setPendingSymptom] = useState(null);
+  const [editSymptom, setEditSymptom] = useState("abdominal_pain");
   const [savedFeedback, setSavedFeedback] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState("");
@@ -255,7 +273,9 @@ export default function MieuxDemain() {
     showFeedback(); resetAndHome();
   }
 
-  function savePain(level) { updateEntries([{ id: genId(), timestamp: new Date().toISOString(), type: "pain", intensity: level }, ...entries]); setShowPainModal(false); showFeedback(); }
+  function openPainModal() { setPainStep("symptom"); setPendingSymptom(null); setShowPainModal(true); }
+  function selectSymptom(key) { setPendingSymptom(key); setPainStep("intensity"); }
+  function savePain(level) { updateEntries([{ id: genId(), timestamp: new Date().toISOString(), type: "pain", intensity: level, symptom: pendingSymptom || "abdominal_pain" }, ...entries]); setShowPainModal(false); showFeedback(); }
 
   function startEdit(entry) {
     // Normalize ingredients: ensure all are {nom, categorie} objects
@@ -271,13 +291,14 @@ export default function MieuxDemain() {
     const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     setEditTimestamp(local);
     setEditPainLevel(entry.intensity || 1);
+    setEditSymptom(entry.symptom || "abdominal_pain");
     setView("edit");
   }
   function saveEdit() {
     const newTimestamp = editTimestamp ? new Date(editTimestamp).toISOString() : editingEntry.timestamp;
     const updated = entries.map(e => {
       if (e.id !== editingEntry.id) return e;
-      if (e.type === "pain") return { ...e, timestamp: newTimestamp, intensity: editPainLevel };
+      if (e.type === "pain") return { ...e, timestamp: newTimestamp, intensity: editPainLevel, symptom: editSymptom };
       return { ...e, timestamp: newTimestamp, dishes: editDishes.split(",").map(d=>d.trim()).filter(Boolean), ingredients: editIngredients };
     });
     updateEntries(updated); showFeedback(); setEditingEntry(null); setView(null); setTab("history");
@@ -383,7 +404,7 @@ export default function MieuxDemain() {
           </div>
           <div style={{display:"flex",gap:12,marginBottom:24}}>
             <button className="gf-btn-secondary" onClick={startCamera}><ScanBarcode size={20} color="#E07A5F"/> Scanner</button>
-            <button className="gf-btn-pain" onClick={()=>setShowPainModal(true)}><Frown size={20}/> Aïe !</button>
+            <button className="gf-btn-pain" onClick={openPainModal}><Frown size={20}/> Aïe !</button>
           </div>
           {entries.length === 0 ? <div style={{textAlign:"center",padding:"32px 0"}}><p style={{fontSize:32,marginBottom:8}}>🌱</p><p style={{fontWeight:600,fontSize:14,color:"#8D99AE"}}>Ton journal est vide</p><p style={{fontSize:12,marginTop:4,color:"#B0B8C8"}}>Commence par noter ce que tu as mangé</p></div>
           : Object.entries(grouped).slice(0,3).map(([day,items]) => <div key={day} style={{marginBottom:16}}><p className="gf-section-label">{day}</p>{items.slice(0,5).map(e => <EntryCard key={e.id} entry={e}/>)}</div>)}
@@ -525,8 +546,18 @@ export default function MieuxDemain() {
           </div>
 
           {editingEntry.type === "pain" ? <>
+            {/* Symptom edit */}
+            <p className="gf-section-label">Type de symptôme</p>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+              {SYMPTOM_TYPES.map(s => (
+                <button key={s.key} onClick={()=>setEditSymptom(s.key)} style={{display:"flex",alignItems:"center",gap:8,borderRadius:12,padding:"10px 12px",border: editSymptom===s.key ? "2.5px solid #E07A5F" : "1.5px solid #F0E6D8",background: editSymptom===s.key ? "#FFF5EE" : "#fff",cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+                  <span style={{fontSize:18,flexShrink:0}}>{s.emoji}</span>
+                  <span style={{fontSize:11,fontWeight:editSymptom===s.key?700:500,lineHeight:1.2}}>{s.label}</span>
+                </button>
+              ))}
+            </div>
             {/* Pain intensity edit */}
-            <p className="gf-section-label">Intensité de la douleur</p>
+            <p className="gf-section-label">Intensité</p>
             <div style={{display:"flex",gap:12,marginBottom:16}}>
               {PAIN_LEVELS.map(pl => (
                 <button key={pl.v} onClick={()=>setEditPainLevel(pl.v)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,borderRadius:16,padding:16,border: editPainLevel===pl.v ? `2.5px solid ${pl.color}` : "1.5px solid #F0E6D8",background: editPainLevel===pl.v ? (pl.v===1?"#FFF8E1":pl.v===2?"#FFF0E0":"#FFF0F0") : "#fff",cursor:"pointer",fontFamily:"inherit",transition:"all .15s"}}>
@@ -552,10 +583,27 @@ export default function MieuxDemain() {
       </div>}
 
       {showPainModal && <div className="gf-modal-backdrop" onClick={()=>setShowPainModal(false)}><div className="gf-modal-bg"/><div className="gf-modal" onClick={e=>e.stopPropagation()}>
-        <div className="gf-modal-handle"/><h2 style={{fontFamily:"Sora",fontWeight:700,textAlign:"center",fontSize:18,marginBottom:4}}>Comment tu te sens ?</h2>
-        <p style={{textAlign:"center",fontSize:12,marginBottom:20,color:"#8D99AE"}}>Enregistré à {new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</p>
-        <div style={{display:"flex",gap:12,marginBottom:16}}>{PAIN_LEVELS.map(pl=><button key={pl.v} onClick={()=>savePain(pl.v)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:8,borderRadius:16,padding:20,border:`1.5px solid ${pl.color}`,background:pl.v===1?"#FFF8E1":pl.v===2?"#FFF0E0":"#FFF0F0",cursor:"pointer",fontFamily:"inherit"}}><span style={{fontSize:28}}>{pl.emoji}</span><span style={{fontSize:12,fontWeight:600}}>{pl.label}</span></button>)}</div>
-        <button onClick={()=>setShowPainModal(false)} style={{width:"100%",padding:12,fontSize:14,fontWeight:500,borderRadius:12,color:"#8D99AE",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+        <div className="gf-modal-handle"/>
+        {painStep === "symptom" ? <>
+          <h2 style={{fontFamily:"Sora",fontWeight:700,textAlign:"center",fontSize:18,marginBottom:4}}>Quel symptôme ?</h2>
+          <p style={{textAlign:"center",fontSize:12,marginBottom:16,color:"#8D99AE"}}>{new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+            {SYMPTOM_TYPES.map(s=>(
+              <button key={s.key} onClick={()=>selectSymptom(s.key)} style={{display:"flex",alignItems:"center",gap:8,borderRadius:12,padding:"10px 12px",border:"1.5px solid #F0E6D8",background:"#fff",cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+                <span style={{fontSize:20,flexShrink:0}}>{s.emoji}</span>
+                <span style={{fontSize:12,fontWeight:600,lineHeight:1.2}}>{s.label}</span>
+              </button>
+            ))}
+          </div>
+          <button onClick={()=>setShowPainModal(false)} style={{width:"100%",padding:12,fontSize:14,fontWeight:500,borderRadius:12,color:"#8D99AE",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+        </> : <>
+          <h2 style={{fontFamily:"Sora",fontWeight:700,textAlign:"center",fontSize:18,marginBottom:4}}>Quelle intensité ?</h2>
+          <p style={{textAlign:"center",fontSize:13,marginBottom:16,color:"#5C5470"}}>
+            {SYMPTOM_TYPES.find(s=>s.key===pendingSymptom)?.emoji} {SYMPTOM_TYPES.find(s=>s.key===pendingSymptom)?.label}
+          </p>
+          <div style={{display:"flex",gap:12,marginBottom:16}}>{PAIN_LEVELS.map(pl=><button key={pl.v} onClick={()=>savePain(pl.v)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:8,borderRadius:16,padding:20,border:`1.5px solid ${pl.color}`,background:pl.v===1?"#FFF8E1":pl.v===2?"#FFF0E0":"#FFF0F0",cursor:"pointer",fontFamily:"inherit"}}><span style={{fontSize:28}}>{pl.emoji}</span><span style={{fontSize:12,fontWeight:600}}>{pl.label}</span></button>)}</div>
+          <button onClick={()=>setPainStep("symptom")} style={{width:"100%",padding:12,fontSize:14,fontWeight:500,borderRadius:12,color:"#8D99AE",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit"}}>← Retour</button>
+        </>}
       </div></div>}
 
       {showSettings && <div className="gf-modal-backdrop" onClick={()=>getApiKey()&&setShowSettings(false)}><div className="gf-modal-bg"/><div className="gf-modal" onClick={e=>e.stopPropagation()}>
