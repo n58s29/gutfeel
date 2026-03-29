@@ -1,23 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2, Search, ChevronDown, ChevronUp, Zap, Settings, Key, ExternalLink, Download, Pencil, Save, Home, ShieldAlert, BookOpen } from "lucide-react";
+import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2, Search, ChevronDown, ChevronUp, Zap, Settings, Key, ExternalLink, Download, Pencil, Save, Home, ShieldAlert, BookOpen, Activity } from "lucide-react";
+import { SYMPTOM_TYPES as SYMPTOM_TYPES_LIB } from "./lib/symptomTypes.js";
+import SymptomForm from "./components/SymptomForm/SymptomForm.jsx";
+import AnalysisDashboard from "./components/Analysis/AnalysisDashboard.jsx";
 
 const CAT_EMOJI = { laitier:"🥛", cereale:"🌾", viande:"🥩", poisson:"🐟", legume:"🥬", fruit:"🍎", noix:"🥜", epice:"🧂", additif:"🧪", legumineuse:"🫘", oeuf:"🥚", sucre:"🍯", graisse:"🫒", autre:"📦" };
 const CAT_LABEL = { laitier:"Produits laitiers", cereale:"Céréales & Gluten", viande:"Viandes", poisson:"Poissons", legume:"Légumes", fruit:"Fruits", noix:"Noix & Graines", epice:"Épices & Condiments", additif:"Additifs", legumineuse:"Légumineuses", oeuf:"Œufs", sucre:"Sucres", graisse:"Huiles & Graisses", autre:"Autres" };
 const PAIN_LEVELS = [{ v:1, emoji:"😐", label:"Léger", color:"#FFE082" }, { v:2, emoji:"😣", label:"Moyen", color:"#FFB74D" }, { v:3, emoji:"🤢", label:"Fort", color:"#EF9A9A" }];
-const SYMPTOM_TYPES = [
-  { key:"abdominal_pain", emoji:"😣", label:"Douleur abdominale" },
-  { key:"gas",            emoji:"💨", label:"Gaz / flatulences" },
-  { key:"bloating",       emoji:"🎈", label:"Ballonnement" },
-  { key:"nausea",         emoji:"🤢", label:"Nausée / vomissement" },
-  { key:"fatigue",        emoji:"😴", label:"Fatigue" },
-  { key:"heartburn",      emoji:"🔥", label:"Brûlures / reflux" },
-  { key:"diarrhea",       emoji:"💧", label:"Diarrhée" },
-  { key:"discomfort",     emoji:"😕", label:"Inconfort abdominal" },
-  { key:"belching",       emoji:"🫧", label:"Éructations" },
-  { key:"headache",       emoji:"🤕", label:"Maux de tête" },
-  { key:"constipation",   emoji:"🧱", label:"Constipation" },
-  { key:"psych_distress", emoji:"😰", label:"Stress / détresse" },
-];
+// Use the canonical list from lib — aliased for backwards-compat with rest of file
+const SYMPTOM_TYPES = SYMPTOM_TYPES_LIB;
 const STORAGE_KEY = "mieuxdemain-entries";
 const APIKEY_KEY = "mieuxdemain-apikey";
 const LOOKBACK_HOURS = 24;
@@ -100,10 +91,11 @@ function computeSuspects(entries) {
 }
 
 function exportCSV(entries) {
-  const header = "Date,Heure,Type,Symptôme,Source,Plats,Ingrédients,Catégories,Additifs,Allergènes,Intensité,Transcript,Produit,Code-barres\n";
+  const header = "Date,Heure,Type,Symptômes,Sévérité,Localisation,Bristol,Source,Plats,Ingrédients,Catégories,Additifs,Allergènes,Transcript,Produit,Code-barres\n";
   const rows = [...entries].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)).map(e => {
-    const symptomLabel = e.type==="pain" ? (SYMPTOM_TYPES.find(s=>s.key===(e.symptom||"abdominal_pain"))?.label||"") : "";
-    return `"${fmtDateShort(e.timestamp)}","${fmtTime(e.timestamp)}","${e.type==="pain"?"Douleur":"Repas"}","${symptomLabel}","${e.source||""}","${(e.dishes||[]).join(" + ")}","${(e.ingredients||[]).map(i=>i.nom).join(", ")}","${[...new Set((e.ingredients||[]).map(i=>CAT_LABEL[i.categorie]||i.categorie))].join(", ")}","${(e.additives||[]).join(", ")}","${(e.allergens||[]).join(", ")}","${e.type==="pain"?(PAIN_LEVELS.find(p=>p.v===e.intensity)?.label||""):""}","${(e.transcript||"").replace(/"/g,'""')}","${e.product_name||""}","${e.barcode||""}"`;
+    const symptomsLabel = e.type==="pain" ? (e.symptoms||[e.symptom||"abdominal_pain"]).map(k=>SYMPTOM_TYPES.find(s=>s.key===k)?.label||k).join(" + ") : "";
+    const severityLabel = e.type==="pain" ? (e.severity ?? (e.intensity===3?7.5:e.intensity===2?5.0:2.5)) : "";
+    return `"${fmtDateShort(e.timestamp)}","${fmtTime(e.timestamp)}","${e.type==="pain"?"Douleur":"Repas"}","${symptomsLabel}","${severityLabel}","${e.location||""}","${e.bristol||""}","${e.source||""}","${(e.dishes||[]).join(" + ")}","${(e.ingredients||[]).map(i=>i.nom).join(", ")}","${[...new Set((e.ingredients||[]).map(i=>CAT_LABEL[i.categorie]||i.categorie))].join(", ")}","${(e.additives||[]).join(", ")}","${(e.allergens||[]).join(", ")}","${(e.transcript||"").replace(/"/g,'""')}","${e.product_name||""}","${e.barcode||""}"`;
   }).join("\n");
   const blob = new Blob(["\uFEFF" + header + rows], { type: "text/csv;charset=utf-8;" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -156,7 +148,7 @@ function EntryCard({ entry, onDelete, onEdit }) {
 }
 
 function BottomNav({ tab, setTab, suspectCount }) {
-  const tabs = [{ id:"home", icon:Home, label:"Journal" }, { id:"suspects", icon:ShieldAlert, label:"Suspects", badge:suspectCount }, { id:"history", icon:BookOpen, label:"Historique" }];
+  const tabs = [{ id:"home", icon:Home, label:"Journal" }, { id:"analysis", icon:Activity, label:"Analyse" }, { id:"suspects", icon:ShieldAlert, label:"Suspects", badge:suspectCount }, { id:"history", icon:BookOpen, label:"Historique" }];
   return (
     <div className="gf-bottomnav">
       {tabs.map(t => (
@@ -195,6 +187,7 @@ export default function MieuxDemain() {
   const [painStep, setPainStep] = useState("symptom"); // "symptom" | "intensity"
   const [pendingSymptom, setPendingSymptom] = useState(null);
   const [editSymptom, setEditSymptom] = useState("abdominal_pain");
+  const [showSymptomForm, setShowSymptomForm] = useState(false);
   const [savedFeedback, setSavedFeedback] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState("");
@@ -271,6 +264,22 @@ export default function MieuxDemain() {
     const ings = (productResult.ingredients || []).map(n => ({ nom: n.toLowerCase(), categorie: "autre" }));
     updateEntries([{ id: genId(), timestamp: new Date().toISOString(), type: "meal", source: "barcode", product_name: productResult.name, barcode: productResult.barcode, brands: productResult.brands, dishes: [productResult.name], ingredients: ings, additives: productResult.additives, allergens: productResult.allergens }, ...entries]);
     showFeedback(); resetAndHome();
+  }
+
+  function saveSymptomEntry({ symptoms, severity, location, bristol, timestamp }) {
+    updateEntries([{
+      id: genId(),
+      timestamp,
+      type: "pain",
+      symptoms,
+      symptom: symptoms[0],           // backwards compat
+      severity,
+      intensity: severity >= 7.5 ? 3 : severity >= 5 ? 2 : 1, // backwards compat
+      location: location ?? null,
+      bristol:  bristol  ?? null,
+    }, ...entries]);
+    setShowSymptomForm(false);
+    showFeedback();
   }
 
   function openPainModal() { setPainStep("symptom"); setPendingSymptom(null); setShowPainModal(true); }
@@ -404,10 +413,18 @@ export default function MieuxDemain() {
           </div>
           <div style={{display:"flex",gap:12,marginBottom:24}}>
             <button className="gf-btn-secondary" onClick={startCamera}><ScanBarcode size={20} color="#E07A5F"/> Scanner</button>
-            <button className="gf-btn-pain" onClick={openPainModal}><Frown size={20}/> Aïe !</button>
+            <button className="gf-btn-pain" onClick={()=>setShowSymptomForm(true)}><Frown size={20}/> Aïe !</button>
           </div>
           {entries.length === 0 ? <div style={{textAlign:"center",padding:"32px 0"}}><p style={{fontSize:32,marginBottom:8}}>🌱</p><p style={{fontWeight:600,fontSize:14,color:"#8D99AE"}}>Ton journal est vide</p><p style={{fontSize:12,marginTop:4,color:"#B0B8C8"}}>Commence par noter ce que tu as mangé</p></div>
           : Object.entries(grouped).slice(0,3).map(([day,items]) => <div key={day} style={{marginBottom:16}}><p className="gf-section-label">{day}</p>{items.slice(0,5).map(e => <EntryCard key={e.id} entry={e}/>)}</div>)}
+        </div>
+      </>}
+
+      {/* ═══ TAB: ANALYSIS ═══ */}
+      {showingTab && tab === "analysis" && <>
+        <div className="gf-header"><div style={{width:28}}/><h1 className="gf-title">📈 Analyse</h1><div style={{width:28}}/></div>
+        <div className="gf-scroll" style={{paddingTop:12}}>
+          <AnalysisDashboard entries={entries}/>
         </div>
       </>}
 
@@ -581,6 +598,8 @@ export default function MieuxDemain() {
         </div>
         <div style={{padding:"0 16px 24px",flexShrink:0}}><button className="gf-btn-primary" onClick={saveEdit}><Save size={18}/> Sauvegarder</button></div>
       </div>}
+
+      {showSymptomForm && <div className="gf-abs" style={{zIndex:60}}><SymptomForm onSave={saveSymptomEntry} onCancel={()=>setShowSymptomForm(false)}/></div>}
 
       {showPainModal && <div className="gf-modal-backdrop" onClick={()=>setShowPainModal(false)}><div className="gf-modal-bg"/><div className="gf-modal" onClick={e=>e.stopPropagation()}>
         <div className="gf-modal-handle"/>
