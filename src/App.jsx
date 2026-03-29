@@ -170,7 +170,7 @@ export default function GutFeel() {
   const [interimText, setInterimText] = useState("");
   const recognitionRef = useRef(null);
   const finalTranscriptRef = useRef("");
-  const lastFinalIndexRef = useRef(0);
+  const isRecordingRef = useRef(false);
 
   // Analysis
   const [analyzing, setAnalyzing] = useState(false);
@@ -215,53 +215,65 @@ export default function GutFeel() {
 
   function saveApiKeyAndClose() { setApiKeyStore(apiKeyInput.trim()); setShowSettings(false); }
 
-  /* ─── Speech Recognition (FIX: dedup) ─── */
+  /* ─── Speech Recognition (FIX v2: single-utterance mode, no duplicates) ─── */
   function startRecognition() {
     if (!getApiKey()) { setShowSettings(true); setError("Configure ta clé API Anthropic d'abord !"); return; }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { setError("Reconnaissance vocale non supportée. Utilise Chrome."); return; }
-    const rec = new SR();
-    rec.lang = "fr-FR";
-    rec.continuous = true;
-    rec.interimResults = true;
 
-    // Reset dedup state
+    // Reset state
     finalTranscriptRef.current = "";
-    lastFinalIndexRef.current = 0;
-
-    rec.onresult = (e) => {
-      let interim = "";
-      // Only process results from lastFinalIndex onwards to avoid duplicates
-      for (let i = lastFinalIndexRef.current; i < e.results.length; i++) {
-        if (e.results[i].isFinal) {
-          finalTranscriptRef.current += e.results[i][0].transcript.trim() + " ";
-          lastFinalIndexRef.current = i + 1;
-        } else {
-          interim += e.results[i][0].transcript;
-        }
-      }
-      setTranscript(finalTranscriptRef.current.trim());
-      setInterimText(interim);
-    };
-    rec.onerror = (e) => { if (e.error !== "no-speech") setError(`Erreur micro : ${e.error}`); };
-    rec.onend = () => {
-      // Auto-restart if still recording, but keep accumulated state
-      if (recognitionRef.current) {
-        try {
-          lastFinalIndexRef.current = 0; // reset index for new recognition session
-          rec.start();
-        } catch {}
-      }
-    };
-    rec.start();
-    recognitionRef.current = rec;
-    setIsRecording(true);
+    isRecordingRef.current = true;
     setTranscript("");
     setInterimText("");
     setView("recording");
+    setIsRecording(true);
+
+    function createAndStartSession() {
+      const rec = new SR();
+      rec.lang = "fr-FR";
+      rec.continuous = false;     // ← single utterance = clean results per session
+      rec.interimResults = true;
+
+      rec.onresult = (e) => {
+        let sessionFinal = "";
+        let interim = "";
+        for (let i = 0; i < e.results.length; i++) {
+          if (e.results[i].isFinal) {
+            sessionFinal += e.results[i][0].transcript;
+          } else {
+            interim += e.results[i][0].transcript;
+          }
+        }
+        if (sessionFinal) {
+          finalTranscriptRef.current += sessionFinal.trim() + " ";
+          setTranscript(finalTranscriptRef.current.trim());
+        }
+        setInterimText(interim);
+      };
+
+      rec.onerror = (e) => {
+        if (e.error !== "no-speech" && e.error !== "aborted") {
+          setError(`Erreur micro : ${e.error}`);
+        }
+      };
+
+      rec.onend = () => {
+        // Auto-restart if still recording (new clean session each time)
+        if (isRecordingRef.current) {
+          try { createAndStartSession(); } catch {}
+        }
+      };
+
+      try { rec.start(); } catch {}
+      recognitionRef.current = rec;
+    }
+
+    createAndStartSession();
   }
 
   function stopRecognition() {
+    isRecordingRef.current = false;
     const rec = recognitionRef.current;
     if (rec) { rec.onend = null; rec.stop(); recognitionRef.current = null; }
     setIsRecording(false);
@@ -391,7 +403,7 @@ export default function GutFeel() {
   function resetAndHome() {
     setTranscript(""); setInterimText(""); setAnalysisResult(null); setEditedIngredients([]);
     setProductResult(null); setManualBarcode(""); setError(null);
-    finalTranscriptRef.current = ""; lastFinalIndexRef.current = 0;
+    finalTranscriptRef.current = ""; isRecordingRef.current = false;
     setView("home");
   }
 
@@ -458,7 +470,7 @@ export default function GutFeel() {
         .gf-btn-pain:active { transform: scale(0.97); }
         .gf-mic-hero { width: 96px; height: 96px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #E07A5F, #D4583B); box-shadow: 0 8px 30px rgba(224,122,95,0.35); border: none; cursor: pointer; animation: gf-pulse 2.5s ease-in-out infinite; transition: transform 0.1s; }
         .gf-mic-hero:active { transform: scale(0.93); }
-        .gf-scroll { flex: 1; overflow-y: auto; padding: 0 16px 16px; -webkit-overflow-scrolling: touch; }
+        .gf-scroll { flex: 1; overflow-y: auto; padding: 0 16px 16px; -webkit-overflow-scrolling: touch; min-height: 0; }
         .gf-section-label { font-family: 'Sora', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #B0A090; margin-bottom: 8px; padding: 0 4px; }
         @keyframes gf-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(224,122,95,0.45)} 50%{box-shadow:0 0 0 22px rgba(224,122,95,0)} }
         @keyframes gf-breathe { 0%,100%{transform:scale(1)} 50%{transform:scale(1.06)} }
@@ -541,7 +553,7 @@ export default function GutFeel() {
 
       {/* ═══ RECORDING (FIX: sticky stop button + scrollable transcript) ═══ */}
       {view === "recording" && (
-        <div style={{ flex:1, display:"flex", flexDirection:"column", background:"linear-gradient(180deg,#FFFBF5 0%,#FFF0E8 100%)" }}>
+        <div style={{ flex:1, display:"flex", flexDirection:"column", background:"linear-gradient(180deg,#FFFBF5 0%,#FFF0E8 100%)", minHeight:0, overflow:"hidden" }}>
           <div style={{ display:"flex", flexDirection:"column", alignItems:"center", paddingTop:40, flexShrink:0 }}>
             <div style={{ width:120, height:120, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", background:"linear-gradient(135deg,#E07A5F,#D4583B)", animation:"gf-breathe 1.8s ease-in-out infinite", boxShadow:"0 10px 40px rgba(224,122,95,0.4)" }}>
               <Mic size={48} color="#fff" strokeWidth={2}/>
@@ -568,7 +580,7 @@ export default function GutFeel() {
 
       {/* ═══ TRANSCRIPT REVIEW ═══ */}
       {view === "transcript" && (
-        <div style={{ flex:1, display:"flex", flexDirection:"column" }}>
+        <div style={{ flex:1, display:"flex", flexDirection:"column", minHeight:0, overflow:"hidden" }}>
           <Header title="Vérification" onBack={resetAndHome}/>
           <div className="gf-scroll" style={{ paddingTop:16 }}>
             <p className="gf-section-label">Ce que j'ai compris</p>
@@ -590,7 +602,7 @@ export default function GutFeel() {
 
       {/* ═══ INGREDIENTS REVIEW ═══ */}
       {view === "ingredients" && (
-        <div style={{ flex:1, display:"flex", flexDirection:"column" }}>
+        <div style={{ flex:1, display:"flex", flexDirection:"column", minHeight:0, overflow:"hidden" }}>
           <Header title="Ingrédients" onBack={() => setView("transcript")}/>
           <div className="gf-scroll" style={{ paddingTop:12 }}>
             {analysisResult?.plats?.length > 0 && (
@@ -619,7 +631,7 @@ export default function GutFeel() {
 
       {/* ═══ SCANNER ═══ */}
       {view === "scanner" && (
-        <div style={{ flex:1, display:"flex", flexDirection:"column", background:"#000" }}>
+        <div style={{ flex:1, display:"flex", flexDirection:"column", background:"#000", minHeight:0, overflow:"hidden" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 16px" }}>
             <button onClick={() => { stopCamera(); resetAndHome(); }} style={{ display:"flex", alignItems:"center", gap:4, fontSize:14, fontWeight:500, color:"#fff", background:"none", border:"none", cursor:"pointer", fontFamily:"inherit" }}>
               <ChevronLeft size={20}/> Retour
@@ -655,9 +667,9 @@ export default function GutFeel() {
         </div>
       )}
 
-      {/* ═══ PRODUCT REVIEW (FIX: save button always visible) ═══ */}
+      {/* ═══ PRODUCT REVIEW (FIX v2: robust flex layout) ═══ */}
       {view === "product" && productResult && (
-        <div style={{ flex:1, display:"flex", flexDirection:"column" }}>
+        <div style={{ flex:1, display:"flex", flexDirection:"column", minHeight:0, overflow:"hidden" }}>
           <Header title="Produit scanné" onBack={resetAndHome}/>
           <div className="gf-scroll" style={{ paddingTop:16 }}>
             <div className="gf-card" style={{ overflow:"hidden", marginBottom:16 }}>
@@ -710,7 +722,7 @@ export default function GutFeel() {
 
       {/* ═══ HISTORY (full + edit + export) ═══ */}
       {view === "history" && (
-        <div style={{ flex:1, display:"flex", flexDirection:"column" }}>
+        <div style={{ flex:1, display:"flex", flexDirection:"column", minHeight:0, overflow:"hidden" }}>
           <Header title="Historique" onBack={() => setView("home")} right={
             entries.length > 0 ? (
               <button onClick={() => exportCSV(entries)} style={{ display:"flex", alignItems:"center", gap:4, fontSize:13, fontWeight:600, color:"#E07A5F", background:"none", border:"none", cursor:"pointer", fontFamily:"inherit" }}>
@@ -744,7 +756,7 @@ export default function GutFeel() {
 
       {/* ═══ EDIT ENTRY ═══ */}
       {view === "edit" && editingEntry && (
-        <div style={{ flex:1, display:"flex", flexDirection:"column" }}>
+        <div style={{ flex:1, display:"flex", flexDirection:"column", minHeight:0, overflow:"hidden" }}>
           <Header title="Modifier" onBack={() => setView("history")}/>
           <div className="gf-scroll" style={{ paddingTop:16 }}>
             <p className="gf-section-label">Plats</p>
