@@ -114,7 +114,7 @@ function EntryCard({ entry, onDelete, onEdit }) {
   const isPain = entry.type === "pain";
   return (
     <div className={`gf-card ${isPain ? "gf-card-pain" : ""}`}>
-      <div className="gf-card-header" onClick={() => !isPain && setOpen(!open)}>
+      <div className="gf-card-header" onClick={() => setOpen(!open)}>
         <div className="gf-card-left">
           <span style={{fontSize:20,flexShrink:0}}>{isPain ? PAIN_LEVELS.find(p=>p.v===entry.intensity)?.emoji||"😣" : entry.source==="barcode"?"📦":"🍽️"}</span>
           <div style={{minWidth:0}}>
@@ -124,7 +124,7 @@ function EntryCard({ entry, onDelete, onEdit }) {
         </div>
         <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
           {!isPain && entry.ingredients?.length > 0 && <span className="gf-badge">{entry.ingredients.length}</span>}
-          {!isPain && (open ? <ChevronUp size={16} color="#8D99AE"/> : <ChevronDown size={16} color="#8D99AE"/>)}
+          {open ? <ChevronUp size={16} color="#8D99AE"/> : <ChevronDown size={16} color="#8D99AE"/>}
         </div>
       </div>
       {open && entry.ingredients?.length > 0 && (
@@ -183,6 +183,9 @@ export default function MieuxDemain() {
   const [editingEntry, setEditingEntry] = useState(null);
   const [editDishes, setEditDishes] = useState("");
   const [editIngredients, setEditIngredients] = useState([]);
+
+  const [editTimestamp, setEditTimestamp] = useState("");
+  const [editPainLevel, setEditPainLevel] = useState(1);
 
   const suspectsData = useMemo(() => computeSuspects(entries), [entries]);
 
@@ -254,14 +257,42 @@ export default function MieuxDemain() {
 
   function savePain(level) { updateEntries([{ id: genId(), timestamp: new Date().toISOString(), type: "pain", intensity: level }, ...entries]); setShowPainModal(false); showFeedback(); }
 
-  function startEdit(entry) { setEditingEntry(entry); setEditDishes((entry.dishes||[]).join(", ")); setEditIngredients([...(entry.ingredients||[])]); setView("edit"); }
-  function saveEdit() { updateEntries(entries.map(e => e.id !== editingEntry.id ? e : { ...e, dishes: editDishes.split(",").map(d=>d.trim()).filter(Boolean), ingredients: editIngredients })); showFeedback(); setEditingEntry(null); setView(null); setTab("history"); }
+  function startEdit(entry) {
+    // Normalize ingredients: ensure all are {nom, categorie} objects
+    const normalizedIngs = (entry.ingredients || []).map(ing => {
+      if (typeof ing === "string") return { nom: ing, categorie: "autre" };
+      return { nom: ing.nom || ing.text || String(ing), categorie: ing.categorie || "autre" };
+    }).filter(ing => ing.nom);
+    setEditingEntry(entry);
+    setEditDishes((entry.dishes || []).join(", "));
+    setEditIngredients(normalizedIngs);
+    // Format timestamp for datetime-local input
+    const d = new Date(entry.timestamp);
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    setEditTimestamp(local);
+    setEditPainLevel(entry.intensity || 1);
+    setView("edit");
+  }
+  function saveEdit() {
+    const newTimestamp = editTimestamp ? new Date(editTimestamp).toISOString() : editingEntry.timestamp;
+    const updated = entries.map(e => {
+      if (e.id !== editingEntry.id) return e;
+      if (e.type === "pain") return { ...e, timestamp: newTimestamp, intensity: editPainLevel };
+      return { ...e, timestamp: newTimestamp, dishes: editDishes.split(",").map(d=>d.trim()).filter(Boolean), ingredients: editIngredients };
+    });
+    updateEntries(updated); showFeedback(); setEditingEntry(null); setView(null); setTab("history");
+  }
 
   function deleteEntry(id) { if (!window.confirm("Supprimer ?")) return; updateEntries(entries.filter(e => e.id !== id)); }
   function resetAndHome() { setTranscript(""); setInterimText(""); setAnalysisResult(null); setEditedIngredients([]); setProductResult(null); setManualBarcode(""); setError(null); finalTranscriptRef.current = ""; isRecordingRef.current = false; setView(null); }
 
   function renderIngredientList(ings, onRemove) {
-    const g = ings.reduce((acc, ing, idx) => { const c = ing.categorie||"autre"; (acc[c]=acc[c]||[]).push({...ing,_idx:idx}); return acc; }, {});
+    if (!ings || !ings.length) return null;
+    const safe = ings.map((ing, idx) => {
+      if (typeof ing === "string") return { nom: ing, categorie: "autre", _idx: idx };
+      return { nom: ing.nom || ing.text || "?", categorie: ing.categorie || "autre", _idx: idx };
+    }).filter(ing => ing.nom && ing.nom !== "?");
+    const g = safe.reduce((acc, ing) => { const c = ing.categorie||"autre"; (acc[c]=acc[c]||[]).push(ing); return acc; }, {});
     return Object.entries(g).sort(([a],[b])=>a.localeCompare(b)).map(([cat,items]) => (
       <div key={cat} style={{marginBottom:12}}>
         <p style={{fontSize:12,fontWeight:600,marginBottom:6,display:"flex",alignItems:"center",gap:6,color:"#5C5470"}}>{CAT_EMOJI[cat]||"📦"} {CAT_LABEL[cat]||cat}</p>
@@ -366,7 +397,8 @@ export default function MieuxDemain() {
             <div style={{flex:1,padding:"10px 12px",borderRadius:12,background:"#FFF5EE",textAlign:"center"}}><p style={{fontSize:20,fontWeight:700,color:"#E07A5F",fontFamily:"Sora"}}>{suspectsData.suspects.length}</p><p style={{fontSize:11,color:"#C4623F",fontWeight:600}}>Suspects</p></div>
           </div>
           {suspectsData.painCount === 0 ? <div style={{textAlign:"center",padding:"40px 20px"}}><p style={{fontSize:40,marginBottom:12}}>😊</p><p style={{fontWeight:700,fontSize:16,color:"#81B29A",fontFamily:"Sora",marginBottom:8}}>Aucune douleur enregistrée</p><p style={{fontSize:13,color:"#8D99AE",lineHeight:1.5}}>C'est une bonne nouvelle ! Quand tu auras mal, appuie sur "Aïe !" pour qu'on cherche ensemble.</p></div>
-          : suspectsData.suspects.length === 0 ? <div style={{textAlign:"center",padding:"40px 20px"}}><p style={{fontSize:40,marginBottom:12}}>🤔</p><p style={{fontWeight:700,fontSize:16,color:"#E07A5F",fontFamily:"Sora",marginBottom:8}}>Pas encore assez de données</p><p style={{fontSize:13,color:"#8D99AE",lineHeight:1.5}}>Continue à noter tes repas et tes douleurs. Les corrélations vont apparaître.</p></div>
+          : (suspectsData.painCount < 3 || suspectsData.mealCount < 5) ? <div style={{textAlign:"center",padding:"40px 20px"}}><p style={{fontSize:40,marginBottom:12}}>📊</p><p style={{fontWeight:700,fontSize:16,color:"#E07A5F",fontFamily:"Sora",marginBottom:8}}>Continue, on y est presque !</p><p style={{fontSize:13,color:"#8D99AE",lineHeight:1.5}}>Il faut au moins <strong>3 douleurs</strong> et <strong>5 repas</strong> pour que les corrélations soient fiables. Tu en es à {suspectsData.painCount} douleur{suspectsData.painCount>1?"s":""} et {suspectsData.mealCount} repas.</p></div>
+          : suspectsData.suspects.length === 0 ? <div style={{textAlign:"center",padding:"40px 20px"}}><p style={{fontSize:40,marginBottom:12}}>🤔</p><p style={{fontWeight:700,fontSize:16,color:"#E07A5F",fontFamily:"Sora",marginBottom:8}}>Aucun suspect identifié</p><p style={{fontSize:13,color:"#8D99AE",lineHeight:1.5}}>Aucun ingrédient ne revient systématiquement avant tes douleurs. Continue à noter, on finira par trouver.</p></div>
           : <>
             <p style={{fontSize:12,color:"#8D99AE",marginBottom:12,padding:"0 4px",lineHeight:1.5}}>Ingrédients consommés dans les <strong>{LOOKBACK_HOURS}h</strong> avant chaque douleur.</p>
             {suspectsData.suspects.map((s,i) => { const lv = getSuspicionLevel(s.frequency); return (
@@ -396,7 +428,7 @@ export default function MieuxDemain() {
         <div className="gf-scroll" style={{paddingTop:12}}>
           {entries.length === 0 ? <div style={{textAlign:"center",padding:"48px 0"}}><p style={{fontSize:32,marginBottom:8}}>📋</p><p style={{fontWeight:600,fontSize:14,color:"#8D99AE"}}>Rien pour l'instant</p></div>
           : <>{<div style={{marginBottom:12,padding:"8px 12px",borderRadius:12,background:"#F5F0E8",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span style={{fontSize:13,fontWeight:600,color:"#8D6E4C"}}>{entries.length} entrée{entries.length>1?"s":""}</span><span style={{fontSize:12,color:"#B0A090"}}>{entries.filter(e=>e.type==="meal").length} repas · {entries.filter(e=>e.type==="pain").length} douleurs</span></div>}
-            {Object.entries(grouped).map(([day,items]) => <div key={day} style={{marginBottom:20}}><p className="gf-section-label">{day}</p>{items.map(e => <EntryCard key={e.id} entry={e} onDelete={deleteEntry} onEdit={e.type==="meal"?startEdit:undefined}/>)}</div>)}</>}
+            {Object.entries(grouped).map(([day,items]) => <div key={day} style={{marginBottom:20}}><p className="gf-section-label">{day}</p>{items.map(e => <EntryCard key={e.id} entry={e} onDelete={deleteEntry} onEdit={startEdit}/>)}</div>)}</>}
         </div>
       </>}
 
@@ -481,13 +513,37 @@ export default function MieuxDemain() {
       </div>}
 
       {view === "edit" && editingEntry && <div className="gf-abs">
-        <Header title="Modifier" onBack={()=>setView(null)}/>
+        <Header title="Modifier" onBack={()=>{setView(null);setEditingEntry(null)}}/>
         <div className="gf-scroll" style={{paddingTop:16}}>
-          <p className="gf-section-label">Plats</p>
-          <div style={{borderRadius:16,padding:12,background:"#fff",border:"1px solid #F0E6D8",marginBottom:16}}><input value={editDishes} onChange={e=>setEditDishes(e.target.value)} placeholder="Ex: pâtes carbonara" style={{width:"100%",fontSize:14,outline:"none",background:"transparent",border:"none",fontFamily:"Nunito"}}/></div>
-          <p className="gf-section-label">{editIngredients.length} ingrédient{editIngredients.length>1?"s":""}</p>
-          {renderIngredientList(editIngredients, removeEditIngredient)}
-          {editingEntry.transcript&&<div style={{marginTop:16}}><p className="gf-section-label">Transcript</p><p style={{fontSize:12,color:"#8D99AE",fontStyle:"italic",padding:"8px 12px",borderRadius:12,background:"#F5F0E8"}}>"{editingEntry.transcript}"</p></div>}
+          {/* Date/time edit */}
+          <p className="gf-section-label">Date et heure</p>
+          <div style={{borderRadius:16,padding:12,background:"#fff",border:"1px solid #F0E6D8",marginBottom:16}}>
+            <input type="datetime-local" value={editTimestamp} onChange={e=>setEditTimestamp(e.target.value)} style={{width:"100%",fontSize:14,outline:"none",background:"transparent",border:"none",fontFamily:"Nunito",color:"#2B2D42"}}/>
+          </div>
+
+          {editingEntry.type === "pain" ? <>
+            {/* Pain intensity edit */}
+            <p className="gf-section-label">Intensité de la douleur</p>
+            <div style={{display:"flex",gap:12,marginBottom:16}}>
+              {PAIN_LEVELS.map(pl => (
+                <button key={pl.v} onClick={()=>setEditPainLevel(pl.v)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,borderRadius:16,padding:16,border: editPainLevel===pl.v ? `2.5px solid ${pl.color}` : "1.5px solid #F0E6D8",background: editPainLevel===pl.v ? (pl.v===1?"#FFF8E1":pl.v===2?"#FFF0E0":"#FFF0F0") : "#fff",cursor:"pointer",fontFamily:"inherit",transition:"all .15s"}}>
+                  <span style={{fontSize:24}}>{pl.emoji}</span>
+                  <span style={{fontSize:12,fontWeight:editPainLevel===pl.v?700:500}}>{pl.label}</span>
+                </button>
+              ))}
+            </div>
+          </> : <>
+            {/* Meal edit */}
+            <p className="gf-section-label">Plats</p>
+            <div style={{borderRadius:16,padding:12,background:"#fff",border:"1px solid #F0E6D8",marginBottom:16}}>
+              <input value={editDishes} onChange={e=>setEditDishes(e.target.value)} placeholder="Ex: pâtes carbonara" style={{width:"100%",fontSize:14,outline:"none",background:"transparent",border:"none",fontFamily:"Nunito"}}/>
+            </div>
+            {editIngredients.length > 0 && <>
+              <p className="gf-section-label">{editIngredients.length} ingrédient{editIngredients.length>1?"s":""}</p>
+              {renderIngredientList(editIngredients, removeEditIngredient)}
+            </>}
+            {editingEntry.transcript && <div style={{marginTop:16}}><p className="gf-section-label">Transcript</p><p style={{fontSize:12,color:"#8D99AE",fontStyle:"italic",padding:"8px 12px",borderRadius:12,background:"#F5F0E8"}}>"{editingEntry.transcript}"</p></div>}
+          </>}
         </div>
         <div style={{padding:"0 16px 24px",flexShrink:0}}><button className="gf-btn-primary" onClick={saveEdit}><Save size={18}/> Sauvegarder</button></div>
       </div>}
