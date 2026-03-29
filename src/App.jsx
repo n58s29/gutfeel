@@ -283,6 +283,9 @@ export default function MieuxDemain() {
     updateEntries(updated); showFeedback(); setEditingEntry(null); setView(null); setTab("history");
   }
 
+  function removeIngredient(idx) { setEditedIngredients(prev => prev.filter((_, i) => i !== idx)); }
+  function removeEditIngredient(idx) { setEditIngredients(prev => prev.filter((_, i) => i !== idx)); }
+
   function deleteEntry(id) { if (!window.confirm("Supprimer ?")) return; updateEntries(entries.filter(e => e.id !== id)); }
   function resetAndHome() { setTranscript(""); setInterimText(""); setAnalysisResult(null); setEditedIngredients([]); setProductResult(null); setManualBarcode(""); setError(null); finalTranscriptRef.current = ""; isRecordingRef.current = false; setView(null); }
 
