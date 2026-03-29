@@ -3,6 +3,7 @@ import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2
 import { SYMPTOM_TYPES as SYMPTOM_TYPES_LIB } from "./lib/symptomTypes.js";
 import SymptomForm from "./components/SymptomForm/SymptomForm.jsx";
 import AnalysisDashboard from "./components/Analysis/AnalysisDashboard.jsx";
+import InfoPanel from "./components/InfoPanel.jsx";
 
 const CAT_EMOJI = { laitier:"🥛", cereale:"🌾", viande:"🥩", poisson:"🐟", legume:"🥬", fruit:"🍎", noix:"🥜", epice:"🧂", additif:"🧪", legumineuse:"🫘", oeuf:"🥚", sucre:"🍯", graisse:"🫒", autre:"📦" };
 const CAT_LABEL = { laitier:"Produits laitiers", cereale:"Céréales & Gluten", viande:"Viandes", poisson:"Poissons", legume:"Légumes", fruit:"Fruits", noix:"Noix & Graines", epice:"Épices & Condiments", additif:"Additifs", legumineuse:"Légumineuses", oeuf:"Œufs", sucre:"Sucres", graisse:"Huiles & Graisses", autre:"Autres" };
@@ -188,6 +189,7 @@ export default function MieuxDemain() {
   const [pendingSymptom, setPendingSymptom] = useState(null);
   const [editSymptom, setEditSymptom] = useState("abdominal_pain");
   const [showSymptomForm, setShowSymptomForm] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
   const [savedFeedback, setSavedFeedback] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState("");
@@ -403,7 +405,9 @@ export default function MieuxDemain() {
         <div className="gf-header">
           <button onClick={()=>setShowSettings(true)} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><Settings size={20} color="#8D99AE"/></button>
           <h1 className="gf-title">Mieux Demain</h1>
-          <div style={{width:28}}/>
+          <button onClick={()=>setShowInfo(true)} style={{background:"none",border:"none",cursor:"pointer",padding:4,display:"flex",alignItems:"center",justifyContent:"center",width:28,height:28,borderRadius:"50%",color:"#8D99AE"}} aria-label="À propos">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8" strokeWidth="3"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
+          </button>
         </div>
         <div className="gf-scroll">
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:24,paddingBottom:16}}>
@@ -600,6 +604,7 @@ export default function MieuxDemain() {
       </div>}
 
       {showSymptomForm && <div className="gf-abs" style={{zIndex:60}}><SymptomForm onSave={saveSymptomEntry} onCancel={()=>setShowSymptomForm(false)}/></div>}
+      {showInfo && <InfoPanel onClose={()=>setShowInfo(false)}/>}
 
       {showPainModal && <div className="gf-modal-backdrop" onClick={()=>setShowPainModal(false)}><div className="gf-modal-bg"/><div className="gf-modal" onClick={e=>e.stopPropagation()}>
         <div className="gf-modal-handle"/>
