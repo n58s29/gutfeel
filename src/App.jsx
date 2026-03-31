@@ -8,6 +8,7 @@ import InfoPanel from "./components/InfoPanel.jsx";
 const CAT_EMOJI = { laitier:"🥛", cereale:"🌾", viande:"🥩", poisson:"🐟", legume:"🥬", fruit:"🍎", noix:"🥜", epice:"🧂", additif:"🧪", legumineuse:"🫘", oeuf:"🥚", sucre:"🍯", graisse:"🫒", autre:"📦" };
 const CAT_LABEL = { laitier:"Produits laitiers", cereale:"Céréales & Gluten", viande:"Viandes", poisson:"Poissons", legume:"Légumes", fruit:"Fruits", noix:"Noix & Graines", epice:"Épices & Condiments", additif:"Additifs", legumineuse:"Légumineuses", oeuf:"Œufs", sucre:"Sucres", graisse:"Huiles & Graisses", autre:"Autres" };
 const PAIN_LEVELS = [{ v:1, emoji:"😐", label:"Léger", color:"#FFE082" }, { v:2, emoji:"😣", label:"Moyen", color:"#FFB74D" }, { v:3, emoji:"🤢", label:"Fort", color:"#EF9A9A" }];
+const PORTION_SIZES = [{ v:"small", emoji:"🥣", label:"Petite" }, { v:"normal", emoji:"🍽️", label:"Normale" }, { v:"large", emoji:"🫕", label:"Grande" }];
 // Use the canonical list from lib — aliased for backwards-compat with rest of file
 const SYMPTOM_TYPES = SYMPTOM_TYPES_LIB;
 const STORAGE_KEY = "mieuxdemain-entries";
@@ -169,7 +170,7 @@ function EntryCard({ entry, onDelete, onEdit, onDuplicate }) {
           <span style={{fontSize:20,flexShrink:0}}>{isPain ? SYMPTOM_TYPES.find(s=>s.key===(entry.symptom||"abdominal_pain"))?.emoji||"😣" : entry.source==="barcode"?"📦":"🍽️"}</span>
           <div style={{minWidth:0}}>
             <p className="gf-card-title">{isPain ? (() => { const st = SYMPTOM_TYPES.find(s=>s.key===(entry.symptom||"abdominal_pain")); const pl = PAIN_LEVELS.find(p=>p.v===entry.intensity); return `${st?.emoji||"😣"} ${st?.label||"Douleur"} – ${pl?.label||"?"}`;})() : (entry.dishes?.join(", ")||entry.product_name||entry.transcript?.slice(0,40)||"Repas")}</p>
-            <p style={{fontSize:11,color:"#8D99AE",marginTop:2}}>{fmtTime(entry.timestamp)}{sourceLabel}</p>
+            <p style={{fontSize:11,color:"#8D99AE",marginTop:2}}>{fmtTime(entry.timestamp)}{sourceLabel}{!isPain && entry.portion && entry.portion !== "normal" ? ` · ${PORTION_SIZES.find(p=>p.v===entry.portion)?.emoji} ${PORTION_SIZES.find(p=>p.v===entry.portion)?.label}` : ""}</p>
           </div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
@@ -242,6 +243,8 @@ export default function MieuxDemain() {
 
   const [editTimestamp, setEditTimestamp] = useState("");
   const [editPainLevel, setEditPainLevel] = useState(1);
+  const [portion, setPortion] = useState("normal");
+  const [editPortion, setEditPortion] = useState("normal");
   const [textInput, setTextInput] = useState("");
   const [capturedImage, setCapturedImage] = useState(null);
   const [currentSource, setCurrentSource] = useState("voice");
@@ -321,7 +324,7 @@ export default function MieuxDemain() {
       "photo-meal": {},
       "photo-label": {},
     };
-    updateEntries([{ id: genId(), timestamp: new Date().toISOString(), type: "meal", source: currentSource, dishes: analysisResult?.plats || [], ingredients: editedIngredients, ...(extraMap[currentSource] || {}) }, ...entries]);
+    updateEntries([{ id: genId(), timestamp: new Date().toISOString(), type: "meal", source: currentSource, dishes: analysisResult?.plats || [], ingredients: editedIngredients, portion, ...(extraMap[currentSource] || {}) }, ...entries]);
     showFeedback(); resetAndHome();
   }
 
@@ -341,7 +344,7 @@ export default function MieuxDemain() {
   }
   function saveProductEntry() {
     const ings = (productResult.ingredients || []).map(n => ({ nom: n.toLowerCase(), categorie: "autre" }));
-    updateEntries([{ id: genId(), timestamp: new Date().toISOString(), type: "meal", source: "barcode", product_name: productResult.name, barcode: productResult.barcode, brands: productResult.brands, dishes: [productResult.name], ingredients: ings, additives: productResult.additives, allergens: productResult.allergens }, ...entries]);
+    updateEntries([{ id: genId(), timestamp: new Date().toISOString(), type: "meal", source: "barcode", product_name: productResult.name, barcode: productResult.barcode, brands: productResult.brands, dishes: [productResult.name], ingredients: ings, additives: productResult.additives, allergens: productResult.allergens, portion }, ...entries]);
     showFeedback(); resetAndHome();
   }
 
@@ -380,6 +383,7 @@ export default function MieuxDemain() {
     setEditTimestamp(local);
     setEditPainLevel(entry.intensity || 1);
     setEditSymptom(entry.symptom || "abdominal_pain");
+    setEditPortion(entry.portion || "normal");
     setView("edit");
   }
   function saveEdit() {
@@ -387,7 +391,7 @@ export default function MieuxDemain() {
     const updated = entries.map(e => {
       if (e.id !== editingEntry.id) return e;
       if (e.type === "pain") return { ...e, timestamp: newTimestamp, intensity: editPainLevel, symptom: editSymptom };
-      return { ...e, timestamp: newTimestamp, dishes: editDishes.split(",").map(d=>d.trim()).filter(Boolean), ingredients: editIngredients };
+      return { ...e, timestamp: newTimestamp, dishes: editDishes.split(",").map(d=>d.trim()).filter(Boolean), ingredients: editIngredients, portion: editPortion };
     });
     updateEntries(updated); showFeedback(); setEditingEntry(null); setView(null); setTab("history");
   }
@@ -401,7 +405,7 @@ export default function MieuxDemain() {
     showFeedback();
   }
   function deleteEntry(id) { if (!window.confirm("Supprimer ?")) return; updateEntries(entries.filter(e => e.id !== id)); }
-  function resetAndHome() { setTranscript(""); setInterimText(""); setAnalysisResult(null); setEditedIngredients([]); setProductResult(null); setManualBarcode(""); setError(null); finalTranscriptRef.current = ""; isRecordingRef.current = false; setCapturedImage(null); setTextInput(""); setCurrentSource("voice"); setView(null); }
+  function resetAndHome() { setTranscript(""); setInterimText(""); setAnalysisResult(null); setEditedIngredients([]); setProductResult(null); setManualBarcode(""); setError(null); finalTranscriptRef.current = ""; isRecordingRef.current = false; setCapturedImage(null); setTextInput(""); setCurrentSource("voice"); setPortion("normal"); setView(null); }
 
   function renderIngredientList(ings, onRemove) {
     if (!ings || !ings.length) return null;
@@ -643,6 +647,17 @@ export default function MieuxDemain() {
           <p style={{fontSize:12,color:"#8D99AE",marginBottom:12}}>Supprime ceux qui ne correspondent pas</p>
           {renderIngredientList(editedIngredients, removeIngredient)}
         </div>
+        <div style={{padding:"0 16px 8px",flexShrink:0}}>
+          <p className="gf-section-label">Quantité mangée</p>
+          <div style={{display:"flex",gap:8,marginBottom:12}}>
+            {PORTION_SIZES.map(ps => (
+              <button key={ps.v} onClick={()=>setPortion(ps.v)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,borderRadius:14,padding:"10px 0",border: portion===ps.v ? "2.5px solid #E07A5F" : "1.5px solid #F0E6D8",background: portion===ps.v ? "#FFF5EE" : "#fff",cursor:"pointer",fontFamily:"inherit",transition:"all .15s"}}>
+                <span style={{fontSize:22}}>{ps.emoji}</span>
+                <span style={{fontSize:12,fontWeight:portion===ps.v?700:500,color: portion===ps.v?"#E07A5F":"#5C5470"}}>{ps.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
         <div style={{padding:"0 16px 24px",flexShrink:0}}><button className="gf-btn-primary" onClick={saveIngredientEntry}><Check size={18}/> Enregistrer ({editedIngredients.length})</button></div>
       </div>}
 
@@ -698,7 +713,18 @@ export default function MieuxDemain() {
           {productResult.additives?.length>0&&<div style={{marginBottom:12}}><p className="gf-section-label">🧪 Additifs</p><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{productResult.additives.map((a,i)=><span key={i} style={{fontSize:11,padding:"4px 8px",borderRadius:99,fontWeight:500,background:"#FFF0F0",border:"1px solid #FECACA",color:"#C4363A"}}>{a}</span>)}</div></div>}
           {productResult.allergens?.length>0&&<div style={{marginBottom:12}}><p className="gf-section-label">⚠️ Allergènes</p><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{productResult.allergens.map((a,i)=><span key={i} style={{fontSize:11,padding:"4px 8px",borderRadius:99,fontWeight:500,background:"#FFF8E1",border:"1px solid #FFE082",color:"#A67C00"}}>{a}</span>)}</div></div>}
         </div>
-        <div style={{padding:"12px 16px 24px",flexShrink:0,borderTop:"1px solid #F0E6D8",background:"#FFFBF5"}}><button className="gf-btn-primary" onClick={saveProductEntry}><Check size={18}/> Ajouter au journal ({productResult.ingredients?.length||0})</button></div>
+        <div style={{padding:"12px 16px 4px",flexShrink:0,borderTop:"1px solid #F0E6D8",background:"#FFFBF5"}}>
+          <p className="gf-section-label">Quantité mangée</p>
+          <div style={{display:"flex",gap:8,marginBottom:12}}>
+            {PORTION_SIZES.map(ps => (
+              <button key={ps.v} onClick={()=>setPortion(ps.v)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,borderRadius:14,padding:"10px 0",border: portion===ps.v ? "2.5px solid #E07A5F" : "1.5px solid #F0E6D8",background: portion===ps.v ? "#FFF5EE" : "#fff",cursor:"pointer",fontFamily:"inherit",transition:"all .15s"}}>
+                <span style={{fontSize:22}}>{ps.emoji}</span>
+                <span style={{fontSize:12,fontWeight:portion===ps.v?700:500,color: portion===ps.v?"#E07A5F":"#5C5470"}}>{ps.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{padding:"0 16px 24px",flexShrink:0,background:"#FFFBF5"}}><button className="gf-btn-primary" onClick={saveProductEntry}><Check size={18}/> Ajouter au journal ({productResult.ingredients?.length||0})</button></div>
       </div>}
 
       {view === "edit" && editingEntry && <div className="gf-abs">
@@ -736,6 +762,15 @@ export default function MieuxDemain() {
             <p className="gf-section-label">Plats</p>
             <div style={{borderRadius:16,padding:12,background:"#fff",border:"1px solid #F0E6D8",marginBottom:16}}>
               <input value={editDishes} onChange={e=>setEditDishes(e.target.value)} placeholder="Ex: pâtes carbonara" style={{width:"100%",fontSize:14,outline:"none",background:"transparent",border:"none",fontFamily:"Nunito"}}/>
+            </div>
+            <p className="gf-section-label" style={{marginTop:8}}>Quantité mangée</p>
+            <div style={{display:"flex",gap:8,marginBottom:16}}>
+              {PORTION_SIZES.map(ps => (
+                <button key={ps.v} onClick={()=>setEditPortion(ps.v)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,borderRadius:14,padding:"10px 0",border: editPortion===ps.v ? "2.5px solid #E07A5F" : "1.5px solid #F0E6D8",background: editPortion===ps.v ? "#FFF5EE" : "#fff",cursor:"pointer",fontFamily:"inherit",transition:"all .15s"}}>
+                  <span style={{fontSize:22}}>{ps.emoji}</span>
+                  <span style={{fontSize:12,fontWeight:editPortion===ps.v?700:500,color: editPortion===ps.v?"#E07A5F":"#5C5470"}}>{ps.label}</span>
+                </button>
+              ))}
             </div>
             {editIngredients.length > 0 && <>
               <p className="gf-section-label">{editIngredients.length} ingrédient{editIngredients.length>1?"s":""}</p>
