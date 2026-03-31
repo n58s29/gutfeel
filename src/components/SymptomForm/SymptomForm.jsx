@@ -13,7 +13,7 @@ export default function SymptomForm({ onSave, onCancel }) {
   const [step, setStep] = useState("symptoms"); // symptoms | details
   const [selectedSymptoms, setSelectedSymptoms] = useState([]);
   const [severity, setSeverity] = useState(null);
-  const [location, setLocation] = useState(null);
+  const [location, setLocation] = useState([]);
   const [bristol, setBristol] = useState(null);
   const [timestamp, setTimestamp] = useState(toLocalDatetimeValue(new Date().toISOString()));
 

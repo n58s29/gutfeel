@@ -1,52 +1,37 @@
 import { useState } from "react";
 
 const ZONES = [
-  {
-    id: "upper_left",
-    label: "Haut gauche",
-    hint: "Estomac, rate, pancréas",
-    d: "M 60 30 L 120 30 L 120 90 L 60 90 Z",
-    cx: 90, cy: 60,
-  },
-  {
-    id: "upper_right",
-    label: "Haut droit",
-    hint: "Foie, vésicule",
-    d: "M 130 30 L 190 30 L 190 90 L 130 90 Z",
-    cx: 160, cy: 60,
-  },
-  {
-    id: "lower_left",
-    label: "Bas gauche",
-    hint: "Côlon descendant, sigmoïde",
-    d: "M 60 100 L 120 100 L 120 160 L 60 160 Z",
-    cx: 90, cy: 130,
-  },
-  {
-    id: "lower_right",
-    label: "Bas droit",
-    hint: "Appendice, iléon terminal",
-    d: "M 130 100 L 190 100 L 190 160 L 130 160 Z",
-    cx: 160, cy: 130,
-  },
-  {
-    id: "diffuse",
-    label: "Diffus / partout",
-    hint: "Douleur généralisée",
-    d: null,
-    cx: 125, cy: 95,
-  },
+  { id: "upper_left",  label: "Haut gauche", hint: "Estomac, rate, pancréas",         cx: 90,  cy: 60  },
+  { id: "upper_right", label: "Haut droit",  hint: "Foie, vésicule",                   cx: 160, cy: 60  },
+  { id: "lower_left",  label: "Bas gauche",  hint: "Côlon descendant, sigmoïde",        cx: 90,  cy: 130 },
+  { id: "lower_right", label: "Bas droit",   hint: "Appendice, iléon terminal",         cx: 160, cy: 130 },
 ];
 
 export default function AbdomenMap({ selected, onChange }) {
   const [hovered, setHovered] = useState(null);
-  const active = selected || null;
+
+  // Normalise : accepte string (ancien format) ou array
+  const active = Array.isArray(selected)
+    ? selected
+    : selected ? [selected] : [];
 
   function toggle(id) {
-    onChange(active === id ? null : id);
+    if (id === "diffuse") {
+      // Diffus : exclusif — si déjà sélectionné on déselectionne, sinon on remplace tout
+      const next = active.includes("diffuse") ? [] : ["diffuse"];
+      onChange(next);
+    } else {
+      // Zone normale : bascule, retire "diffuse" si présent
+      const withoutDiffuse = active.filter(z => z !== "diffuse");
+      const next = withoutDiffuse.includes(id)
+        ? withoutDiffuse.filter(z => z !== id)
+        : [...withoutDiffuse, id];
+      onChange(next);
+    }
   }
 
-  const activeZone = ZONES.find(z => z.id === active);
+  const activeZones = ZONES.filter(z => active.includes(z.id));
+  const isDiffuse = active.includes("diffuse");
 
   return (
     <div>
@@ -59,9 +44,9 @@ export default function AbdomenMap({ selected, onChange }) {
         {/* Body outline ellipse */}
         <ellipse cx="125" cy="95" rx="72" ry="72" fill="#FFF5EE" stroke="#F0E6D8" strokeWidth="1.5" />
 
-        {/* Grid zones (upper/lower left/right) */}
-        {ZONES.filter(z => z.id !== "diffuse").map(z => {
-          const isActive = active === z.id;
+        {/* Grid zones */}
+        {ZONES.map(z => {
+          const isActive = active.includes(z.id);
           const isHov = hovered === z.id;
           return (
             <rect
@@ -88,7 +73,7 @@ export default function AbdomenMap({ selected, onChange }) {
         <line x1="62" y1="95" x2="188" y2="95" stroke="#F0C8B0" strokeWidth="1" />
 
         {/* Zone labels */}
-        {ZONES.filter(z => z.id !== "diffuse").map(z => (
+        {ZONES.map(z => (
           <text
             key={z.id + "_label"}
             x={z.cx}
@@ -96,7 +81,7 @@ export default function AbdomenMap({ selected, onChange }) {
             textAnchor="middle"
             dominantBaseline="middle"
             fontSize="8"
-            fill={active === z.id ? "#fff" : "#8D6E4C"}
+            fill={active.includes(z.id) ? "#fff" : "#8D6E4C"}
             fontFamily="Nunito, sans-serif"
             fontWeight="600"
             style={{ pointerEvents: "none", userSelect: "none" }}
@@ -115,9 +100,9 @@ export default function AbdomenMap({ selected, onChange }) {
           marginTop: 8,
           padding: "10px 0",
           borderRadius: 12,
-          border: active === "diffuse" ? "2px solid #E07A5F" : "1.5px solid #F0E6D8",
-          background: active === "diffuse" ? "#FFF5EE" : "#fff",
-          color: active === "diffuse" ? "#E07A5F" : "#5C5470",
+          border: isDiffuse ? "2px solid #E07A5F" : "1.5px solid #F0E6D8",
+          background: isDiffuse ? "#FFF5EE" : "#fff",
+          color: isDiffuse ? "#E07A5F" : "#5C5470",
           fontFamily: "Nunito, sans-serif",
           fontWeight: 600,
           fontSize: 13,
@@ -127,10 +112,12 @@ export default function AbdomenMap({ selected, onChange }) {
         🌐 Diffus / partout
       </button>
 
-      {/* Active zone hint */}
-      {activeZone && (
-        <p style={{ textAlign: "center", fontSize: 11, color: "#8D99AE", marginTop: 6 }}>
-          {activeZone.label} — {activeZone.hint}
+      {/* Active zones hint */}
+      {(activeZones.length > 0 || isDiffuse) && (
+        <p style={{ textAlign: "center", fontSize: 11, color: "#8D99AE", marginTop: 6, lineHeight: 1.5 }}>
+          {isDiffuse
+            ? "Diffus / partout — Douleur généralisée"
+            : activeZones.map(z => `${z.label} (${z.hint})`).join(" · ")}
         </p>
       )}
     </div>
