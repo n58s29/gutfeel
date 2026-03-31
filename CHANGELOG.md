@@ -1,5 +1,12 @@
 # Changelog — GutFeel
 
+## v0.5.0 — 31 mars 2026
+
+### Nouveau
+- **Multi-sélection des zones de douleur** : on peut sélectionner plusieurs zones abdominales simultanément (ex. haut gauche + bas droit). "Diffus / partout" reste exclusif. Rétrocompatible avec les anciennes entrées.
+
+---
+
 ## v0.4.0 — 31 mars 2026
 
 ### Nouveau
