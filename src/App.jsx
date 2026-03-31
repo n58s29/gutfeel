@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2, Search, ChevronDown, ChevronUp, Zap, Settings, Key, ExternalLink, Download, Pencil, Save, Home, ShieldAlert, BookOpen, Activity, MessageSquare, ScanLine, Type, Camera, Tag } from "lucide-react";
+import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2, Search, ChevronDown, ChevronUp, Zap, Settings, Key, ExternalLink, Download, Pencil, Save, Home, ShieldAlert, BookOpen, Activity, MessageSquare, ScanLine, Type, Camera, Tag, Copy } from "lucide-react";
 import { SYMPTOM_TYPES as SYMPTOM_TYPES_LIB } from "./lib/symptomTypes.js";
 import SymptomForm from "./components/SymptomForm/SymptomForm.jsx";
 import AnalysisDashboard from "./components/Analysis/AnalysisDashboard.jsx";
@@ -158,9 +158,10 @@ function Header({ title, onBack, right }) {
   return <div className="gf-header">{onBack ? <button onClick={onBack} className="gf-back-btn"><ChevronLeft size={20}/> Retour</button> : <div style={{width:80}}/>}<h1 className="gf-title">{title}</h1>{right || <div style={{width:80}}/>}</div>;
 }
 
-function EntryCard({ entry, onDelete, onEdit }) {
+function EntryCard({ entry, onDelete, onEdit, onDuplicate }) {
   const [open, setOpen] = useState(false);
   const isPain = entry.type === "pain";
+  const sourceLabel = { voice:" · vocal", text:" · texte", "photo-meal":" · photo", "photo-label":" · étiquette", barcode:" · scan" }[entry.source] || "";
   return (
     <div className={`gf-card ${isPain ? "gf-card-pain" : ""}`}>
       <div className="gf-card-header" onClick={() => setOpen(!open)}>
@@ -168,7 +169,7 @@ function EntryCard({ entry, onDelete, onEdit }) {
           <span style={{fontSize:20,flexShrink:0}}>{isPain ? SYMPTOM_TYPES.find(s=>s.key===(entry.symptom||"abdominal_pain"))?.emoji||"😣" : entry.source==="barcode"?"📦":"🍽️"}</span>
           <div style={{minWidth:0}}>
             <p className="gf-card-title">{isPain ? (() => { const st = SYMPTOM_TYPES.find(s=>s.key===(entry.symptom||"abdominal_pain")); const pl = PAIN_LEVELS.find(p=>p.v===entry.intensity); return `${st?.emoji||"😣"} ${st?.label||"Douleur"} – ${pl?.label||"?"}`;})() : (entry.dishes?.join(", ")||entry.product_name||entry.transcript?.slice(0,40)||"Repas")}</p>
-            <p style={{fontSize:11,color:"#8D99AE",marginTop:2}}>{fmtTime(entry.timestamp)}{entry.source==="barcode"?" · scan":entry.source==="voice"?" · vocal":""}</p>
+            <p style={{fontSize:11,color:"#8D99AE",marginTop:2}}>{fmtTime(entry.timestamp)}{sourceLabel}</p>
           </div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
@@ -181,6 +182,7 @@ function EntryCard({ entry, onDelete, onEdit }) {
       )}
       {open && (
         <div style={{display:"flex",gap:8,marginTop:8,justifyContent:"flex-end"}}>
+          {!isPain && onDuplicate && <button onClick={ev=>{ev.stopPropagation();onDuplicate(entry)}} className="gf-action-btn" style={{background:"#EEEDFE",color:"#534AB7"}}><Copy size={12}/> Re-manger</button>}
           {onEdit && <button onClick={ev=>{ev.stopPropagation();onEdit(entry)}} className="gf-action-btn" style={{background:"#F0E6D8",color:"#8D6E4C"}}><Pencil size={12}/> Modifier</button>}
           {onDelete && <button onClick={ev=>{ev.stopPropagation();onDelete(entry.id)}} className="gf-action-btn" style={{background:"#FFF0F0",color:"#E63946"}}><Trash2 size={12}/> Supprimer</button>}
         </div>
@@ -393,6 +395,11 @@ export default function MieuxDemain() {
   function removeIngredient(idx) { setEditedIngredients(prev => prev.filter((_, i) => i !== idx)); }
   function removeEditIngredient(idx) { setEditIngredients(prev => prev.filter((_, i) => i !== idx)); }
 
+  function duplicateEntry(entry) {
+    const { id: _id, timestamp: _ts, ...rest } = entry;
+    updateEntries([{ ...rest, id: genId(), timestamp: new Date().toISOString() }, ...entries]);
+    showFeedback();
+  }
   function deleteEntry(id) { if (!window.confirm("Supprimer ?")) return; updateEntries(entries.filter(e => e.id !== id)); }
   function resetAndHome() { setTranscript(""); setInterimText(""); setAnalysisResult(null); setEditedIngredients([]); setProductResult(null); setManualBarcode(""); setError(null); finalTranscriptRef.current = ""; isRecordingRef.current = false; setCapturedImage(null); setTextInput(""); setCurrentSource("voice"); setView(null); }
 
@@ -534,7 +541,7 @@ export default function MieuxDemain() {
           </div>
           <button className="gf-btn-pain" style={{width:"100%",marginBottom:20}} onClick={()=>setShowSymptomForm(true)}><Frown size={20}/> Signaler une douleur</button>
           {entries.length === 0 ? <div style={{textAlign:"center",padding:"24px 0"}}><p style={{fontSize:32,marginBottom:8}}>🌱</p><p style={{fontWeight:600,fontSize:14,color:"#8D99AE"}}>Ton journal est vide</p><p style={{fontSize:12,marginTop:4,color:"#B0B8C8"}}>Commence par noter ce que tu as mangé</p></div>
-          : Object.entries(grouped).slice(0,3).map(([day,items]) => <div key={day} style={{marginBottom:16}}><p className="gf-section-label">{day}</p>{items.slice(0,5).map(e => <EntryCard key={e.id} entry={e}/>)}</div>)}
+          : Object.entries(grouped).slice(0,3).map(([day,items]) => <div key={day} style={{marginBottom:16}}><p className="gf-section-label">{day}</p>{items.slice(0,5).map(e => <EntryCard key={e.id} entry={e} onDuplicate={duplicateEntry}/>)}</div>)}
         </div>
       </>}
 
@@ -587,7 +594,7 @@ export default function MieuxDemain() {
         <div className="gf-scroll" style={{paddingTop:12}}>
           {entries.length === 0 ? <div style={{textAlign:"center",padding:"48px 0"}}><p style={{fontSize:32,marginBottom:8}}>📋</p><p style={{fontWeight:600,fontSize:14,color:"#8D99AE"}}>Rien pour l'instant</p></div>
           : <>{<div style={{marginBottom:12,padding:"8px 12px",borderRadius:12,background:"#F5F0E8",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span style={{fontSize:13,fontWeight:600,color:"#8D6E4C"}}>{entries.length} entrée{entries.length>1?"s":""}</span><span style={{fontSize:12,color:"#B0A090"}}>{entries.filter(e=>e.type==="meal").length} repas · {entries.filter(e=>e.type==="pain").length} douleurs</span></div>}
-            {Object.entries(grouped).map(([day,items]) => <div key={day} style={{marginBottom:20}}><p className="gf-section-label">{day}</p>{items.map(e => <EntryCard key={e.id} entry={e} onDelete={deleteEntry} onEdit={startEdit}/>)}</div>)}</>}
+            {Object.entries(grouped).map(([day,items]) => <div key={day} style={{marginBottom:20}}><p className="gf-section-label">{day}</p>{items.map(e => <EntryCard key={e.id} entry={e} onDelete={deleteEntry} onEdit={startEdit} onDuplicate={duplicateEntry}/>)}</div>)}</>}
         </div>
       </>}
 
