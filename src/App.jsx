@@ -774,17 +774,18 @@ export default function MieuxDemain() {
         </>}
       </div></div>}
 
-      {showSettings && <div className="gf-modal-backdrop" onClick={()=>getApiKey()&&setShowSettings(false)}><div className="gf-modal-bg"/><div className="gf-modal" onClick={e=>e.stopPropagation()}>
+      {showSettings && <div className="gf-modal-backdrop" onClick={()=>setShowSettings(false)}><div className="gf-modal-bg"/><div className="gf-modal" onClick={e=>e.stopPropagation()}>
         <div className="gf-modal-handle"/><h2 style={{fontFamily:"Sora",fontWeight:700,textAlign:"center",fontSize:18,marginBottom:4}}><Key size={20} style={{display:"inline",verticalAlign:"-3px",marginRight:8}}/>Configuration</h2>
-        <p style={{textAlign:"center",fontSize:12,marginBottom:20,color:"#8D99AE"}}>Clé nécessaire pour l'analyse vocale</p>
+        <p style={{textAlign:"center",fontSize:12,marginBottom:20,color:"#8D99AE"}}>Clé nécessaire pour l'analyse IA (audio, texte, photo)</p>
         <div style={{padding:16}}>
           <label style={{display:"block",fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,color:"#B0A090",marginBottom:8,fontFamily:"Sora"}}>Clé API Anthropic</label>
           <input type="password" value={apiKeyInput} onChange={e=>setApiKeyInput(e.target.value)} placeholder="sk-ant-api03-..." style={{width:"100%",borderRadius:12,padding:"12px 16px",fontSize:14,background:"#fff",border:"1.5px solid #F0E6D8",outline:"none",fontFamily:"monospace"}}/>
           <p style={{fontSize:11,color:"#8D99AE",marginTop:8}}>🔒 Stockée uniquement dans ton navigateur.</p>
           <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style={{fontSize:12,color:"#E07A5F",display:"flex",alignItems:"center",gap:4,marginTop:8,textDecoration:"none"}}><ExternalLink size={12}/> Obtenir une clé API</a>
+          {!getApiKey() && <p style={{fontSize:11,color:"#B0A090",marginTop:12,padding:"8px 10px",borderRadius:8,background:"#F5F0E8"}}>Sans clé, seul le scan code-barres et la saisie manuelle restent disponibles.</p>}
         </div>
         <div style={{display:"flex",gap:12,marginTop:20}}>
-          {getApiKey()&&<button onClick={()=>setShowSettings(false)} style={{flex:1,borderRadius:16,padding:14,fontWeight:600,fontSize:14,background:"#F0E6D8",color:"#8D6E4C",border:"none",cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>}
+          <button onClick={()=>setShowSettings(false)} style={{flex:1,borderRadius:16,padding:14,fontWeight:600,fontSize:14,background:"#F0E6D8",color:"#8D6E4C",border:"none",cursor:"pointer",fontFamily:"inherit"}}>{getApiKey()?"Annuler":"Passer"}</button>
           <button onClick={()=>{setApiKeyStore(apiKeyInput.trim());setShowSettings(false)}} disabled={!apiKeyInput.trim()} style={{flex:1,borderRadius:16,padding:14,fontWeight:600,fontSize:14,background:apiKeyInput.trim()?"#81B29A":"#D8D0C8",color:"#fff",border:"none",cursor:"pointer",fontFamily:"inherit"}}>Enregistrer</button>
         </div>
       </div></div>}
