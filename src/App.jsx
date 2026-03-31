@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2, Search, ChevronDown, ChevronUp, Zap, Settings, Key, ExternalLink, Download, Pencil, Save, Home, ShieldAlert, BookOpen, Activity } from "lucide-react";
+import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2, Search, ChevronDown, ChevronUp, Zap, Settings, Key, ExternalLink, Download, Pencil, Save, Home, ShieldAlert, BookOpen, Activity, MessageSquare, ScanLine, Type, Camera, Tag } from "lucide-react";
 import { SYMPTOM_TYPES as SYMPTOM_TYPES_LIB } from "./lib/symptomTypes.js";
 import SymptomForm from "./components/SymptomForm/SymptomForm.jsx";
 import AnalysisDashboard from "./components/Analysis/AnalysisDashboard.jsx";
@@ -42,6 +42,47 @@ async function lookupBarcode(code) {
   if (data.status !== 1) return null;
   const p = data.product;
   return { name: p.product_name_fr || p.product_name || "Produit inconnu", image: p.image_front_url || p.image_url || null, ingredients_text: p.ingredients_text_fr || p.ingredients_text || "", ingredients: (p.ingredients || []).map(i => i.text), additives: (p.additives_tags || []).map(t => t.replace("en:", "")), allergens: (p.allergens_tags || []).map(t => t.replace("en:", "")), brands: p.brands || "", barcode: code };
+}
+
+async function compressImage(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const maxW = 1024;
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      const base64 = canvas.toDataURL("image/jpeg", 0.7).split(",")[1];
+      URL.revokeObjectURL(url);
+      resolve(base64);
+    };
+    img.src = url;
+  });
+}
+
+async function analyzeImageWithAI(base64Data, mode, apiKey) {
+  const prompt = mode === "label"
+    ? `Tu es un expert en nutrition et en OCR.\nCette photo montre la liste des ingrédients d'un produit alimentaire.\n1. Extrais le texte de la liste d'ingrédients visible sur l'image.\n2. Décompose chaque ingrédient individuellement (sépare les ingrédients composés).\n3. Catégorise chaque ingrédient parmi : laitier, cereale, viande, poisson, legume, fruit, noix, epice, additif, legumineuse, oeuf, sucre, graisse, autre.\nRéponds UNIQUEMENT en JSON : [{"nom": "...", "categorie": "..."}]\nPas de markdown, pas de commentaire, juste le JSON.`
+    : `Tu es un expert en nutrition. Analyse cette photo d'assiette/repas.\nIdentifie tous les ingrédients visibles et probables.\nPour chaque ingrédient, donne son nom et sa catégorie parmi : laitier, cereale, viande, poisson, legume, fruit, noix, epice, additif, legumineuse, oeuf, sucre, graisse, autre.\nRéponds UNIQUEMENT en JSON : [{"nom": "...", "categorie": "..."}]\nPas de markdown, pas de commentaire, juste le JSON.`;
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000,
+      messages: [{ role: "user", content: [
+        { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64Data } },
+        { type: "text", text: prompt }
+      ]}]
+    })
+  });
+  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err?.error?.message || `Erreur API (${res.status})`); }
+  const data = await res.json();
+  const raw = data.content?.map(b => b.text || "").join("") || "";
+  const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
+  if (Array.isArray(parsed)) return { plats: [], ingredients: parsed };
+  return { plats: parsed.plats || [], ingredients: parsed.ingredients || [] };
 }
 
 function fmtTime(iso) { return new Date(iso).toLocaleTimeString("fr-FR", { hour:"2-digit", minute:"2-digit" }); }
@@ -199,6 +240,10 @@ export default function MieuxDemain() {
 
   const [editTimestamp, setEditTimestamp] = useState("");
   const [editPainLevel, setEditPainLevel] = useState(1);
+  const [textInput, setTextInput] = useState("");
+  const [capturedImage, setCapturedImage] = useState(null);
+  const [currentSource, setCurrentSource] = useState("voice");
+  const [visionMsg, setVisionMsg] = useState("");
 
   const suspectsData = useMemo(() => computeSuspects(entries), [entries]);
 
@@ -240,11 +285,41 @@ export default function MieuxDemain() {
 
   async function handleAnalyze() {
     setAnalyzing(true); setError(null);
-    try { const r = await decomposeWithAI(transcript, getApiKey()); setAnalysisResult(r); setEditedIngredients(r.ingredients || []); setView("ingredients"); }
+    try { const r = await decomposeWithAI(transcript, getApiKey()); setAnalysisResult(r); setEditedIngredients(r.ingredients || []); setCurrentSource("voice"); setView("ingredients"); }
     catch (e) { setError(e.message || "Erreur analyse IA."); } finally { setAnalyzing(false); }
   }
-  function saveVoiceEntry() {
-    updateEntries([{ id: genId(), timestamp: new Date().toISOString(), type: "meal", source: "voice", transcript, dishes: analysisResult?.plats || [], ingredients: editedIngredients }, ...entries]);
+  async function handleTextAnalyze() {
+    if (!getApiKey()) { setShowSettings(true); setError("Configure ta clé API d'abord !"); return; }
+    setAnalyzing(true); setError(null);
+    try { const r = await decomposeWithAI(textInput, getApiKey()); setAnalysisResult(r); setEditedIngredients(r.ingredients || []); setCurrentSource("text"); setView("ingredients"); }
+    catch (e) { setError(e.message || "Erreur analyse IA."); } finally { setAnalyzing(false); }
+  }
+  async function handleImageCapture(file, mode) {
+    if (!file) return;
+    if (!getApiKey()) { setShowSettings(true); setError("Configure ta clé API d'abord !"); return; }
+    try {
+      const base64 = await compressImage(file);
+      setCapturedImage(`data:image/jpeg;base64,${base64}`);
+      setVisionMsg(mode === "label" ? "Lecture de l'étiquette en cours..." : "Analyse de votre assiette en cours...");
+      setView("vision-loading"); setError(null);
+      const result = await analyzeImageWithAI(base64, mode, getApiKey());
+      if (!result.ingredients?.length) {
+        setError("Aucun ingrédient reconnu. Essaie avec une photo plus nette ou sous meilleur éclairage.");
+        setView(null); return;
+      }
+      setAnalysisResult(result); setEditedIngredients(result.ingredients);
+      setCurrentSource(mode === "label" ? "photo-label" : "photo-meal");
+      setView("ingredients");
+    } catch (e) { setError(e.message || "Erreur lors de l'analyse de l'image."); setView(null); }
+  }
+  function saveIngredientEntry() {
+    const extraMap = {
+      "voice": { transcript },
+      "text": { transcript: textInput },
+      "photo-meal": {},
+      "photo-label": {},
+    };
+    updateEntries([{ id: genId(), timestamp: new Date().toISOString(), type: "meal", source: currentSource, dishes: analysisResult?.plats || [], ingredients: editedIngredients, ...(extraMap[currentSource] || {}) }, ...entries]);
     showFeedback(); resetAndHome();
   }
 
@@ -319,7 +394,7 @@ export default function MieuxDemain() {
   function removeEditIngredient(idx) { setEditIngredients(prev => prev.filter((_, i) => i !== idx)); }
 
   function deleteEntry(id) { if (!window.confirm("Supprimer ?")) return; updateEntries(entries.filter(e => e.id !== id)); }
-  function resetAndHome() { setTranscript(""); setInterimText(""); setAnalysisResult(null); setEditedIngredients([]); setProductResult(null); setManualBarcode(""); setError(null); finalTranscriptRef.current = ""; isRecordingRef.current = false; setView(null); }
+  function resetAndHome() { setTranscript(""); setInterimText(""); setAnalysisResult(null); setEditedIngredients([]); setProductResult(null); setManualBarcode(""); setError(null); finalTranscriptRef.current = ""; isRecordingRef.current = false; setCapturedImage(null); setTextInput(""); setCurrentSource("voice"); setView(null); }
 
   function renderIngredientList(ings, onRemove) {
     if (!ings || !ings.length) return null;
@@ -409,17 +484,56 @@ export default function MieuxDemain() {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8" strokeWidth="3"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
           </button>
         </div>
-        <div className="gf-scroll">
-          <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:24,paddingBottom:16}}>
-            <button className="gf-mic-hero" onClick={startRecognition}><Mic size={38} color="#fff" strokeWidth={2.5}/></button>
-            <p style={{marginTop:12,fontWeight:600,fontSize:14}}>Enregistrer un repas</p>
-            <p style={{fontSize:12,marginTop:2,color:"#8D99AE"}}>Dis ce que tu as mangé</p>
+        <div className="gf-scroll" style={{paddingTop:16}}>
+          {/* Carte 1 — Décrivez votre repas */}
+          <div style={{borderRadius:20,padding:16,background:"#EEEDFE",border:"1px solid #C5C2F5",marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <MessageSquare size={16} color="#534AB7"/>
+              <span style={{fontFamily:"Sora",fontWeight:700,fontSize:14,color:"#534AB7"}}>Décrivez votre repas</span>
+            </div>
+            <p style={{fontSize:12,color:"#7A74C4",marginBottom:14}}>Vous savez ce que vous mangez ? Décrivez-le</p>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={startRecognition} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,borderRadius:14,padding:"14px 8px",background:"#fff",border:"1.5px solid #C5C2F5",cursor:"pointer",fontFamily:"inherit"}}>
+                <Mic size={22} color="#534AB7"/>
+                <span style={{fontSize:11,fontWeight:700,color:"#534AB7"}}>Audio</span>
+              </button>
+              <button onClick={()=>{if(!getApiKey()){setShowSettings(true);return;}setView("text-input")}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,borderRadius:14,padding:"14px 8px",background:"#fff",border:"1.5px solid #C5C2F5",cursor:"pointer",fontFamily:"inherit"}}>
+                <Type size={22} color="#534AB7"/>
+                <span style={{fontSize:11,fontWeight:700,color:"#534AB7"}}>Texte</span>
+              </button>
+              <label style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,borderRadius:14,padding:"14px 8px",background:"#FEF3C7",border:"1.5px solid #FCD34D",cursor:"pointer",fontFamily:"inherit"}}>
+                <Camera size={22} color="#854F0B"/>
+                <span style={{fontSize:11,fontWeight:700,color:"#854F0B"}}>Photo</span>
+                <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{handleImageCapture(e.target.files[0],"meal");e.target.value="";}}/>
+              </label>
+            </div>
           </div>
-          <div style={{display:"flex",gap:12,marginBottom:24}}>
-            <button className="gf-btn-secondary" onClick={startCamera}><ScanBarcode size={20} color="#E07A5F"/> Scanner</button>
-            <button className="gf-btn-pain" onClick={()=>setShowSymptomForm(true)}><Frown size={20}/> Aïe !</button>
+          {/* Carte 2 — Scannez un produit */}
+          <div style={{borderRadius:20,padding:16,background:"#E1F5EE",border:"1px solid #A7DEC8",marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <ScanLine size={16} color="#0F6E56"/>
+              <span style={{fontFamily:"Sora",fontWeight:700,fontSize:14,color:"#0F6E56"}}>Scannez un produit</span>
+            </div>
+            <p style={{fontSize:12,color:"#2A8F72",marginBottom:14}}>Vous avez l'emballage ? Scannez-le</p>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={startCamera} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,borderRadius:14,padding:"14px 8px",background:"#fff",border:"1.5px solid #A7DEC8",cursor:"pointer",fontFamily:"inherit"}}>
+                <ScanBarcode size={22} color="#0F6E56"/>
+                <span style={{fontSize:11,fontWeight:700,color:"#0F6E56"}}>Code-barres</span>
+              </button>
+              <label style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6,borderRadius:14,padding:"14px 8px",background:"#fff",border:"1.5px solid #A7DEC8",cursor:"pointer",fontFamily:"inherit",position:"relative"}}>
+                <span style={{position:"absolute",top:6,right:6,fontSize:9,fontWeight:700,padding:"2px 5px",borderRadius:99,background:"#FAEEDA",color:"#854F0B"}}>new</span>
+                <Tag size={22} color="#0F6E56"/>
+                <span style={{fontSize:11,fontWeight:700,color:"#0F6E56"}}>Étiquette</span>
+                <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{handleImageCapture(e.target.files[0],"label");e.target.value="";}}/>
+              </label>
+            </div>
           </div>
-          {entries.length === 0 ? <div style={{textAlign:"center",padding:"32px 0"}}><p style={{fontSize:32,marginBottom:8}}>🌱</p><p style={{fontWeight:600,fontSize:14,color:"#8D99AE"}}>Ton journal est vide</p><p style={{fontSize:12,marginTop:4,color:"#B0B8C8"}}>Commence par noter ce que tu as mangé</p></div>
+          {/* Séparateur + douleur */}
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+            <div style={{flex:1,height:1,background:"#F0E6D8"}}/><span style={{fontSize:12,color:"#B0A090",fontWeight:500}}>ou</span><div style={{flex:1,height:1,background:"#F0E6D8"}}/>
+          </div>
+          <button className="gf-btn-pain" style={{width:"100%",marginBottom:20}} onClick={()=>setShowSymptomForm(true)}><Frown size={20}/> Signaler une douleur</button>
+          {entries.length === 0 ? <div style={{textAlign:"center",padding:"24px 0"}}><p style={{fontSize:32,marginBottom:8}}>🌱</p><p style={{fontWeight:600,fontSize:14,color:"#8D99AE"}}>Ton journal est vide</p><p style={{fontSize:12,marginTop:4,color:"#B0B8C8"}}>Commence par noter ce que tu as mangé</p></div>
           : Object.entries(grouped).slice(0,3).map(([day,items]) => <div key={day} style={{marginBottom:16}}><p className="gf-section-label">{day}</p>{items.slice(0,5).map(e => <EntryCard key={e.id} entry={e}/>)}</div>)}
         </div>
       </>}
@@ -514,14 +628,37 @@ export default function MieuxDemain() {
       </div>}
 
       {view === "ingredients" && <div className="gf-abs">
-        <Header title="Ingrédients" onBack={()=>setView("transcript")}/>
+        <Header title="Ingrédients" onBack={()=>{ if(currentSource==="voice") setView("transcript"); else if(currentSource==="text") setView("text-input"); else resetAndHome(); }}/>
         <div className="gf-scroll" style={{paddingTop:12}}>
+          {capturedImage && <div style={{marginBottom:12,display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,background:"#F5F0E8"}}><img src={capturedImage} alt="" style={{width:48,height:48,objectFit:"cover",borderRadius:8,flexShrink:0}}/><span style={{fontSize:12,color:"#8D6E4C"}}>Photo analysée par IA</span></div>}
           {analysisResult?.plats?.length > 0 && <div style={{marginBottom:12}}><p className="gf-section-label">Plats identifiés</p><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{analysisResult.plats.map((p,i) => <span key={i} style={{fontSize:12,padding:"6px 12px",borderRadius:99,fontWeight:600,background:"#E07A5F",color:"#fff"}}>🍽️ {p}</span>)}</div></div>}
           <p className="gf-section-label" style={{marginTop:12}}>{editedIngredients.length} ingrédient{editedIngredients.length>1?"s":""}</p>
           <p style={{fontSize:12,color:"#8D99AE",marginBottom:12}}>Supprime ceux qui ne correspondent pas</p>
           {renderIngredientList(editedIngredients, removeIngredient)}
         </div>
-        <div style={{padding:"0 16px 24px",flexShrink:0}}><button className="gf-btn-primary" onClick={saveVoiceEntry}><Check size={18}/> Enregistrer ({editedIngredients.length})</button></div>
+        <div style={{padding:"0 16px 24px",flexShrink:0}}><button className="gf-btn-primary" onClick={saveIngredientEntry}><Check size={18}/> Enregistrer ({editedIngredients.length})</button></div>
+      </div>}
+
+      {view === "text-input" && <div className="gf-abs">
+        <Header title="Décrivez votre repas" onBack={resetAndHome}/>
+        <div className="gf-scroll" style={{paddingTop:16}}>
+          <p style={{fontSize:12,color:"#8D99AE",marginBottom:8}}>Décris ce que tu as mangé en quelques mots</p>
+          <div style={{borderRadius:16,padding:16,background:"#fff",border:"1px solid #F0E6D8",marginBottom:12}}>
+            <textarea value={textInput} onChange={e=>setTextInput(e.target.value)} rows={6} placeholder="Ex. : salade niçoise avec thon, tomates, œufs, olives..." style={{width:"100%",fontSize:14,resize:"none",outline:"none",background:"transparent",border:"none",fontFamily:"Nunito",lineHeight:1.6}}/>
+          </div>
+        </div>
+        <div style={{padding:"0 16px 24px",display:"flex",gap:12,flexShrink:0}}>
+          <button onClick={resetAndHome} style={{flex:1,borderRadius:16,padding:14,fontWeight:600,fontSize:14,background:"#F0E6D8",color:"#8D6E4C",border:"none",cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+          <button onClick={handleTextAnalyze} disabled={analyzing||!textInput.trim()} style={{flex:1,borderRadius:16,padding:14,fontWeight:600,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:analyzing?"#9E96D8":"linear-gradient(135deg,#534AB7,#4039A0)",color:"#fff",border:"none",cursor:"pointer",fontFamily:"inherit",opacity:(!textInput.trim()&&!analyzing)?0.5:1}}>
+            {analyzing ? <><Loader2 size={16} className="gf-spin"/> Analyse...</> : <><Search size={16}/> Analyser</>}
+          </button>
+        </div>
+      </div>}
+
+      {view === "vision-loading" && <div className="gf-abs" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24,padding:40}}>
+        {capturedImage && <img src={capturedImage} alt="" style={{width:180,height:180,objectFit:"cover",borderRadius:20,border:"2px solid #F0E6D8",boxShadow:"0 8px 24px rgba(0,0,0,.12)"}}/>}
+        <Loader2 size={32} className="gf-spin" color="#534AB7"/>
+        <p style={{fontWeight:600,fontSize:15,color:"#534AB7",textAlign:"center",lineHeight:1.5}}>{visionMsg}</p>
       </div>}
 
       {view === "scanner" && <div className="gf-abs" style={{background:"#000"}}>
