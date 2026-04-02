@@ -1,4 +1,5 @@
 import { ChevronLeft, ExternalLink } from "lucide-react";
+import { version } from "../../package.json";
 
 const STUDIES = [
   {
@@ -319,6 +320,7 @@ export default function InfoPanel({ onClose }) {
         <div style={{ textAlign: "center", paddingTop: 8 }}>
           <p style={{ fontFamily: "Sora, sans-serif", fontWeight: 700, fontSize: 14, color: "#81B29A", marginBottom: 4 }}>Mieux Demain</p>
           <p style={{ fontSize: 11, color: "#8D99AE" }}>Un journal de bord intelligent, pas un diagnostic médical.</p>
+          <p style={{ fontSize: 11, color: "#B0A090", marginTop: 6 }}>v{version}</p>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10, fontSize: 11, padding: "6px 14px", borderRadius: 99, background: "#EEF5F0", border: "1px solid #C8DDD0", color: "#81B29A", fontWeight: 600 }}>
             🔒 Tes données restent sur ton téléphone
           </span>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2, Search, ChevronDown, ChevronUp, Zap, Settings, Key, ExternalLink, Download, Pencil, Save, Home, ShieldAlert, BookOpen, Activity, MessageSquare, ScanLine, Type, Camera, Tag, Copy } from "lucide-react";
 import { SYMPTOM_TYPES as SYMPTOM_TYPES_LIB } from "./lib/symptomTypes.js";
+import { normalizeIngredients } from "./lib/foodNormalizer.js";
 import SymptomForm from "./components/SymptomForm/SymptomForm.jsx";
 import AnalysisDashboard from "./components/Analysis/AnalysisDashboard.jsx";
 import InfoPanel from "./components/InfoPanel.jsx";
@@ -13,6 +14,7 @@ const PORTION_SIZES = [{ v:"small", emoji:"🥣", label:"Petite" }, { v:"normal"
 const SYMPTOM_TYPES = SYMPTOM_TYPES_LIB;
 const STORAGE_KEY = "mieuxdemain-entries";
 const APIKEY_KEY = "mieuxdemain-apikey";
+const MIGRATION_KEY = "mieuxdemain-migration-v1-food-normalize";
 const LOOKBACK_HOURS = 24;
 
 function loadEntries() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; } }
@@ -26,6 +28,7 @@ async function decomposeWithAI(text, apiKey) {
     headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
     body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000,
       messages: [{ role: "user", content: `Tu es un expert en nutrition. L'utilisateur décrit ce qu'il a mangé. Identifie TOUS les ingrédients élémentaires (non transformés). Inclus les ingrédients "cachés" courants et les additifs probables si produit industriel.
+IMPORTANT : Les noms d'ingrédients doivent TOUJOURS être en français, en minuscules, au singulier. Exemple : "poulet", "farine de blé", "huile d'olive".
 Réponds UNIQUEMENT en JSON valide sans backticks:
 {"plats":["nom1","nom2"],"ingredients":[{"nom":"farine de blé","categorie":"cereale"}]}
 Catégories: laitier, cereale, viande, poisson, legume, fruit, noix, epice, additif, legumineuse, oeuf, sucre, graisse, autre
@@ -34,7 +37,8 @@ Description: "${text}"` }] })
   if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err?.error?.message || `Erreur API (${res.status})`); }
   const data = await res.json();
   const raw = data.content?.map(b => b.text || "").join("") || "";
-  return JSON.parse(raw.replace(/```json|```/g, "").trim());
+  const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
+  return { ...parsed, ingredients: normalizeIngredients(parsed.ingredients || []) };
 }
 
 async function lookupBarcode(code) {
@@ -66,8 +70,8 @@ async function compressImage(file) {
 
 async function analyzeImageWithAI(base64Data, mode, apiKey) {
   const prompt = mode === "label"
-    ? `Tu es un expert en nutrition et en OCR.\nCette photo montre la liste des ingrédients d'un produit alimentaire.\n1. Extrais le texte de la liste d'ingrédients visible sur l'image.\n2. Décompose chaque ingrédient individuellement (sépare les ingrédients composés).\n3. Catégorise chaque ingrédient parmi : laitier, cereale, viande, poisson, legume, fruit, noix, epice, additif, legumineuse, oeuf, sucre, graisse, autre.\nRéponds UNIQUEMENT en JSON : [{"nom": "...", "categorie": "..."}]\nPas de markdown, pas de commentaire, juste le JSON.`
-    : `Tu es un expert en nutrition. Analyse cette photo d'assiette/repas.\nIdentifie tous les ingrédients visibles et probables.\nPour chaque ingrédient, donne son nom et sa catégorie parmi : laitier, cereale, viande, poisson, legume, fruit, noix, epice, additif, legumineuse, oeuf, sucre, graisse, autre.\nRéponds UNIQUEMENT en JSON : [{"nom": "...", "categorie": "..."}]\nPas de markdown, pas de commentaire, juste le JSON.`;
+    ? `Tu es un expert en nutrition et en OCR.\nCette photo montre la liste des ingrédients d'un produit alimentaire.\n1. Extrais le texte de la liste d'ingrédients visible sur l'image.\n2. Décompose chaque ingrédient individuellement (sépare les ingrédients composés).\n3. Catégorise chaque ingrédient parmi : laitier, cereale, viande, poisson, legume, fruit, noix, epice, additif, legumineuse, oeuf, sucre, graisse, autre.\nIMPORTANT : Les noms doivent TOUJOURS être en français, en minuscules, au singulier.\nRéponds UNIQUEMENT en JSON : [{"nom": "...", "categorie": "..."}]\nPas de markdown, pas de commentaire, juste le JSON.`
+    : `Tu es un expert en nutrition. Analyse cette photo d'assiette/repas.\nIdentifie tous les ingrédients visibles et probables.\nPour chaque ingrédient, donne son nom et sa catégorie parmi : laitier, cereale, viande, poisson, legume, fruit, noix, epice, additif, legumineuse, oeuf, sucre, graisse, autre.\nIMPORTANT : Les noms doivent TOUJOURS être en français, en minuscules, au singulier.\nRéponds UNIQUEMENT en JSON : [{"nom": "...", "categorie": "..."}]\nPas de markdown, pas de commentaire, juste le JSON.`;
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
@@ -82,8 +86,9 @@ async function analyzeImageWithAI(base64Data, mode, apiKey) {
   const data = await res.json();
   const raw = data.content?.map(b => b.text || "").join("") || "";
   const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
-  if (Array.isArray(parsed)) return { plats: [], ingredients: parsed };
-  return { plats: parsed.plats || [], ingredients: parsed.ingredients || [] };
+  const ingredients = normalizeIngredients(Array.isArray(parsed) ? parsed : (parsed.ingredients || []));
+  if (Array.isArray(parsed)) return { plats: [], ingredients };
+  return { plats: parsed.plats || [], ingredients };
 }
 
 function fmtTime(iso) { return new Date(iso).toLocaleTimeString("fr-FR", { hour:"2-digit", minute:"2-digit" }); }
@@ -257,6 +262,19 @@ export default function MieuxDemain() {
     if (old && !localStorage.getItem(STORAGE_KEY)) localStorage.setItem(STORAGE_KEY, old);
     const oldK = localStorage.getItem("gutfeel-apikey");
     if (oldK && !localStorage.getItem(APIKEY_KEY)) localStorage.setItem(APIKEY_KEY, oldK);
+    // Migration : normalise les noms d'ingrédients existants (une seule fois)
+    if (!localStorage.getItem(MIGRATION_KEY)) {
+      try {
+        const raw = loadEntries();
+        const migrated = raw.map(e =>
+          e.type === "meal" && e.ingredients?.length
+            ? { ...e, ingredients: normalizeIngredients(e.ingredients) }
+            : e
+        );
+        persistEntries(migrated);
+      } catch {}
+      localStorage.setItem(MIGRATION_KEY, "1");
+    }
     setEntries(loadEntries()); setApiKeyInput(getApiKey()); setHasBarcodeAPI("BarcodeDetector" in window);
     if (!getApiKey()) setShowSettings(true);
   }, []);

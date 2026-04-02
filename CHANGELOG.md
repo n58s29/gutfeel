@@ -1,5 +1,14 @@
 # Changelog — GutFeel
 
+## v0.6.0 — 1 avril 2026
+
+### Nouveau
+- **Normalisation des noms d'ingrédients** : les ingrédients sont désormais toujours stockés en français, en minuscules, au singulier. Un dictionnaire de ~180 synonymes (anglicismes, variantes orthographiques, alias courants) les ramène vers une forme canonique unique (ex. "chicken" → "poulet", "patate" → "pomme de terre", "yogurt" → "yaourt").
+- **Migration automatique** : les données existantes sont normalisées silencieusement au premier lancement, sans perte d'information.
+- **Numéro de version** : la version de l'app est désormais affichée dans le panneau "À propos" (lu depuis package.json).
+
+---
+
 ## v0.5.0 — 31 mars 2026
 
 ### Nouveau
