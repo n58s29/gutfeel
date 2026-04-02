@@ -9,6 +9,7 @@
 - **Catégorisation des ingrédients barcode** : les ingrédients issus d'un scan code-barres héritaient tous de la catégorie "autre" (📦). Ils sont désormais catégorisés automatiquement par détection de mots-clés (ex. "farine de blé" → céréale, "beurre" → laitier, "diphosphates" → additif).
 - **Migration automatique** des entrées existantes pour re-catégoriser les ingrédients barcode.
 - **Emojis catégories** mis à jour : légume 🥬→🥦, épice 🧂→🌶️, sucre 🍯→🍬, autre 📦→🔹.
+- **Onglet Analyse** : les anciens emojis (🥬, 🧂, 🍯, 📦) étaient encore présents dans les composants `IngredientRanking` et `FodmapGroupView` qui avaient leur propre copie locale — alignés sur la palette commune.
 
 ---
 
