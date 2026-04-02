@@ -2,7 +2,7 @@ import { useState } from "react";
 import { SYMPTOM_TYPES } from "../../lib/symptomTypes.js";
 import { getFodmapCategories, FODMAP_CATEGORIES } from "../../lib/fodmapDictionary.js";
 
-const CAT_EMOJI = { laitier:"🥛", cereale:"🌾", viande:"🥩", poisson:"🐟", legume:"🥬", fruit:"🍎", noix:"🥜", epice:"🧂", additif:"🧪", legumineuse:"🫘", oeuf:"🥚", sucre:"🍯", graisse:"🫒", autre:"📦" };
+const CAT_EMOJI = { laitier:"🥛", cereale:"🌾", viande:"🥩", poisson:"🐟", legume:"🥦", fruit:"🍎", noix:"🥜", epice:"🌶️", additif:"🧪", legumineuse:"🫘", oeuf:"🥚", sucre:"🍬", graisse:"🫒", autre:"🔹" };
 
 function ImpactBar({ score, maxScore }) {
   const pct = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
@@ -62,7 +62,7 @@ export default function IngredientRanking({ data, onSelectIngredient }) {
               style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", cursor: "pointer" }}
               onClick={() => setExpanded(isOpen ? null : ing.name)}
             >
-              <span style={{ fontSize: 18, flexShrink: 0 }}>{CAT_EMOJI[ing.categorie] || "📦"}</span>
+              <span style={{ fontSize: 18, flexShrink: 0 }}>{CAT_EMOJI[ing.categorie] || "🔹"}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                   <span style={{ fontWeight: 700, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

@@ -197,7 +197,7 @@ function EntryCard({ entry, onDelete, onEdit, onDuplicate }) {
         </div>
       </div>
       {open && entry.ingredients?.length > 0 && (
-        <div className="gf-card-ingredients">{entry.ingredients.map((ing,i) => <span key={i} className="gf-ingredient-tag">{CAT_EMOJI[ing.categorie]||"📦"} {ing.nom}</span>)}</div>
+        <div className="gf-card-ingredients">{entry.ingredients.map((ing,i) => <span key={i} className="gf-ingredient-tag">{CAT_EMOJI[ing.categorie]||"🔹"} {ing.nom}</span>)}</div>
       )}
       {open && (
         <div style={{display:"flex",gap:8,marginTop:8,justifyContent:"flex-end"}}>
@@ -461,7 +461,7 @@ export default function MieuxDemain() {
     const g = safe.reduce((acc, ing) => { const c = ing.categorie||"autre"; (acc[c]=acc[c]||[]).push(ing); return acc; }, {});
     return Object.entries(g).sort(([a],[b])=>a.localeCompare(b)).map(([cat,items]) => (
       <div key={cat} style={{marginBottom:12}}>
-        <p style={{fontSize:12,fontWeight:600,marginBottom:6,display:"flex",alignItems:"center",gap:6,color:"#5C5470"}}>{CAT_EMOJI[cat]||"📦"} {CAT_LABEL[cat]||cat}</p>
+        <p style={{fontSize:12,fontWeight:600,marginBottom:6,display:"flex",alignItems:"center",gap:6,color:"#5C5470"}}>{CAT_EMOJI[cat]||"🔹"} {CAT_LABEL[cat]||cat}</p>
         <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{items.map(ing => (
           <span key={ing._idx} style={{fontSize:12,padding:"4px 4px 4px 10px",borderRadius:99,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4,background:"#fff",border:"1px solid #F0E6D8",color:"#2B2D42"}}>
             {ing.nom}<button onClick={()=>onRemove(ing._idx)} style={{borderRadius:99,padding:2,marginLeft:2,background:"none",border:"none",cursor:"pointer"}}><X size={12} color="#E63946"/></button>
@@ -619,7 +619,7 @@ export default function MieuxDemain() {
             {suspectsData.suspects.map((s,i) => { const lv = getSuspicionLevel(s.frequency); return (
               <div key={s.name} className="gf-suspect" style={{background:lv.bg,border:`1px solid ${lv.border}`,animationDelay:`${i*.05}s`}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:16}}>{CAT_EMOJI[s.categorie]||"📦"}</span><span style={{fontWeight:700,fontSize:14}}>{s.name}</span></div>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:16}}>{CAT_EMOJI[s.categorie]||"🔹"}</span><span style={{fontWeight:700,fontSize:14}}>{s.name}</span></div>
                   <span style={{fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:99,background:lv.color,color:"#fff"}}>{lv.label}</span>
                 </div>
                 <SuspectBar pct={s.frequency} color={lv.color}/>

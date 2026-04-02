@@ -1,6 +1,6 @@
 import { FODMAP_CATEGORIES, getFodmapCategories } from "../../lib/fodmapDictionary.js";
 
-const CAT_EMOJI = { laitier:"🥛", cereale:"🌾", viande:"🥩", poisson:"🐟", legume:"🥬", fruit:"🍎", noix:"🥜", epice:"🧂", additif:"🧪", legumineuse:"🫘", oeuf:"🥚", sucre:"🍯", graisse:"🫒", autre:"📦" };
+const CAT_EMOJI = { laitier:"🥛", cereale:"🌾", viande:"🥩", poisson:"🐟", legume:"🥦", fruit:"🍎", noix:"🥜", epice:"🌶️", additif:"🧪", legumineuse:"🫘", oeuf:"🥚", sucre:"🍬", graisse:"🫒", autre:"🔹" };
 
 export default function FodmapGroupView({ data }) {
   if (!data?.ingredients?.length) return null;
@@ -88,7 +88,7 @@ export default function FodmapGroupView({ data }) {
                       fontWeight: 500,
                     }}
                   >
-                    {CAT_EMOJI[ing.categorie] || "📦"} {ing.name}
+                    {CAT_EMOJI[ing.categorie] || "🔹"} {ing.name}
                   </span>
                 ))}
             </div>
