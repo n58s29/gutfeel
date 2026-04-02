@@ -1,5 +1,17 @@
 # Changelog — GutFeel
 
+## v0.6.1 — 2 avril 2026
+
+### Nouveau
+- **Icônes de source harmonisées** : chaque entrée repas affiche désormais une icône Lucide colorée selon la saisie (🎙 vocal, ⌨️ texte, 📷 photo repas, 🏷 étiquette, 🔲 scan). Plus de 📦 partout.
+
+### Corrections
+- **Catégorisation des ingrédients barcode** : les ingrédients issus d'un scan code-barres héritaient tous de la catégorie "autre" (📦). Ils sont désormais catégorisés automatiquement par détection de mots-clés (ex. "farine de blé" → céréale, "beurre" → laitier, "diphosphates" → additif).
+- **Migration automatique** des entrées existantes pour re-catégoriser les ingrédients barcode.
+- **Emojis catégories** mis à jour : légume 🥬→🥦, épice 🧂→🌶️, sucre 🍯→🍬, autre 📦→🔹.
+
+---
+
 ## v0.6.0 — 1 avril 2026
 
 ### Nouveau

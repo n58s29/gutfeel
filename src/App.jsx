@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2, Search, ChevronDown, ChevronUp, Zap, Settings, Key, ExternalLink, Download, Pencil, Save, Home, ShieldAlert, BookOpen, Activity, MessageSquare, ScanLine, Type, Camera, Tag, Copy } from "lucide-react";
 import { SYMPTOM_TYPES as SYMPTOM_TYPES_LIB } from "./lib/symptomTypes.js";
-import { normalizeIngredients } from "./lib/foodNormalizer.js";
+import { normalizeIngredients, guessCategory } from "./lib/foodNormalizer.js";
 import SymptomForm from "./components/SymptomForm/SymptomForm.jsx";
 import AnalysisDashboard from "./components/Analysis/AnalysisDashboard.jsx";
 import InfoPanel from "./components/InfoPanel.jsx";
 
-const CAT_EMOJI = { laitier:"🥛", cereale:"🌾", viande:"🥩", poisson:"🐟", legume:"🥬", fruit:"🍎", noix:"🥜", epice:"🧂", additif:"🧪", legumineuse:"🫘", oeuf:"🥚", sucre:"🍯", graisse:"🫒", autre:"📦" };
+const CAT_EMOJI = { laitier:"🥛", cereale:"🌾", viande:"🥩", poisson:"🐟", legume:"🥦", fruit:"🍎", noix:"🥜", epice:"🌶️", additif:"🧪", legumineuse:"🫘", oeuf:"🥚", sucre:"🍬", graisse:"🫒", autre:"🔹" };
 const CAT_LABEL = { laitier:"Produits laitiers", cereale:"Céréales & Gluten", viande:"Viandes", poisson:"Poissons", legume:"Légumes", fruit:"Fruits", noix:"Noix & Graines", epice:"Épices & Condiments", additif:"Additifs", legumineuse:"Légumineuses", oeuf:"Œufs", sucre:"Sucres", graisse:"Huiles & Graisses", autre:"Autres" };
 const PAIN_LEVELS = [{ v:1, emoji:"😐", label:"Léger", color:"#FFE082" }, { v:2, emoji:"😣", label:"Moyen", color:"#FFB74D" }, { v:3, emoji:"🤢", label:"Fort", color:"#EF9A9A" }];
 const PORTION_SIZES = [{ v:"small", emoji:"🥣", label:"Petite" }, { v:"normal", emoji:"🍽️", label:"Normale" }, { v:"large", emoji:"🫕", label:"Grande" }];
@@ -15,6 +15,7 @@ const SYMPTOM_TYPES = SYMPTOM_TYPES_LIB;
 const STORAGE_KEY = "mieuxdemain-entries";
 const APIKEY_KEY = "mieuxdemain-apikey";
 const MIGRATION_KEY = "mieuxdemain-migration-v1-food-normalize";
+const MIGRATION_KEY_V2 = "mieuxdemain-migration-v2-barcode-cats";
 const LOOKBACK_HOURS = 24;
 
 function loadEntries() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; } }
@@ -160,6 +161,18 @@ function getSuspicionLevel(freq) {
   return { label:"Faible", color:"#8D99AE", bg:"#F5F5F5", border:"#E0E0E0" };
 }
 
+const SOURCE_CFG = {
+  voice:         { Icon: Mic,         color: "#E07A5F", bg: "#FDEEE8" },
+  text:          { Icon: Type,        color: "#8D6E4C", bg: "#F5EDE4" },
+  "photo-meal":  { Icon: Camera,      color: "#81B29A", bg: "#EEF5F0" },
+  "photo-label": { Icon: Tag,         color: "#8D99AE", bg: "#F0F3F7" },
+  barcode:       { Icon: ScanBarcode, color: "#5C6BC0", bg: "#ECEEFE" },
+};
+function SourceIcon({ source }) {
+  const { Icon, color, bg } = SOURCE_CFG[source] || SOURCE_CFG.voice;
+  return <div style={{ width:34, height:34, borderRadius:10, background:bg, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><Icon size={16} color={color}/></div>;
+}
+
 function Header({ title, onBack, right }) {
   return <div className="gf-header">{onBack ? <button onClick={onBack} className="gf-back-btn"><ChevronLeft size={20}/> Retour</button> : <div style={{width:80}}/>}<h1 className="gf-title">{title}</h1>{right || <div style={{width:80}}/>}</div>;
 }
@@ -172,7 +185,7 @@ function EntryCard({ entry, onDelete, onEdit, onDuplicate }) {
     <div className={`gf-card ${isPain ? "gf-card-pain" : ""}`}>
       <div className="gf-card-header" onClick={() => setOpen(!open)}>
         <div className="gf-card-left">
-          <span style={{fontSize:20,flexShrink:0}}>{isPain ? SYMPTOM_TYPES.find(s=>s.key===(entry.symptom||"abdominal_pain"))?.emoji||"😣" : entry.source==="barcode"?"📦":"🍽️"}</span>
+          {isPain ? <span style={{fontSize:20,flexShrink:0}}>{SYMPTOM_TYPES.find(s=>s.key===(entry.symptom||"abdominal_pain"))?.emoji||"😣"}</span> : <SourceIcon source={entry.source}/>}
           <div style={{minWidth:0}}>
             <p className="gf-card-title">{isPain ? (() => { const st = SYMPTOM_TYPES.find(s=>s.key===(entry.symptom||"abdominal_pain")); const pl = PAIN_LEVELS.find(p=>p.v===entry.intensity); return `${st?.emoji||"😣"} ${st?.label||"Douleur"} – ${pl?.label||"?"}`;})() : (entry.dishes?.join(", ")||entry.product_name||entry.transcript?.slice(0,40)||"Repas")}</p>
             <p style={{fontSize:11,color:"#8D99AE",marginTop:2}}>{fmtTime(entry.timestamp)}{sourceLabel}{!isPain && entry.portion && entry.portion !== "normal" ? ` · ${PORTION_SIZES.find(p=>p.v===entry.portion)?.emoji} ${PORTION_SIZES.find(p=>p.v===entry.portion)?.label}` : ""}</p>
@@ -275,6 +288,20 @@ export default function MieuxDemain() {
       } catch {}
       localStorage.setItem(MIGRATION_KEY, "1");
     }
+    // Migration v2 : re-catégorise les ingrédients barcode qui avaient tous "autre"
+    if (!localStorage.getItem(MIGRATION_KEY_V2)) {
+      try {
+        const raw = loadEntries();
+        const migrated = raw.map(e => {
+          if (e.type === "meal" && e.source === "barcode" && e.ingredients?.length) {
+            return { ...e, ingredients: e.ingredients.map(ing => ({ ...ing, categorie: ing.categorie === "autre" ? guessCategory(ing.nom) : ing.categorie })) };
+          }
+          return e;
+        });
+        persistEntries(migrated);
+      } catch {}
+      localStorage.setItem(MIGRATION_KEY_V2, "1");
+    }
     setEntries(loadEntries()); setApiKeyInput(getApiKey()); setHasBarcodeAPI("BarcodeDetector" in window);
     if (!getApiKey()) setShowSettings(true);
   }, []);
@@ -361,7 +388,7 @@ export default function MieuxDemain() {
     catch { setError("Erreur recherche produit."); } finally { setBarcodeLoading(false); }
   }
   function saveProductEntry() {
-    const ings = (productResult.ingredients || []).map(n => ({ nom: n.toLowerCase(), categorie: "autre" }));
+    const ings = (productResult.ingredients || []).map(n => { const nom = n.toLowerCase(); return { nom, categorie: guessCategory(nom) }; });
     updateEntries([{ id: genId(), timestamp: new Date().toISOString(), type: "meal", source: "barcode", product_name: productResult.name, barcode: productResult.barcode, brands: productResult.brands, dishes: [productResult.name], ingredients: ings, additives: productResult.additives, allergens: productResult.allergens, portion }, ...entries]);
     showFeedback(); resetAndHome();
   }

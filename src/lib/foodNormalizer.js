@@ -224,6 +224,39 @@ const SYNONYMS = {
   "cube de bouillon": "bouillon",
 };
 
+// Mots-clés par catégorie pour deviner la catégorie d'un ingrédient
+const CATEGORY_KEYWORDS = {
+  laitier:     ["lait", "crème", "beurre", "fromage", "yaourt", "lactose", "caséine", "lactosérum", "whey", "mozzarella", "parmesan", "comté", "gruyère", "gouda", "cheddar", "brie", "camembert", "roquefort", "emmental", "mascarpone", "ricotta", "skyr"],
+  cereale:     ["farine", "blé", "seigle", "orge", "avoine", "épeautre", "gluten", "amidon", "fécule", "pâtes", "semoule", "céréale", "flocon", "son de"],
+  viande:      ["poulet", "bœuf", "porc", "agneau", "veau", "dinde", "canard", "jambon", "bacon", "lardon", "saucisse", "saucisson", "chorizo", "merguez", "viande", "gelée de porc"],
+  poisson:     ["saumon", "thon", "cabillaud", "sole", "truite", "sardine", "anchois", "maquereau", "dorade", "poisson", "crevette", "moule", "huître", "homard", "crabe"],
+  legume:      ["carotte", "tomate", "oignon", "ail", "poireau", "courgette", "aubergine", "poivron", "brocoli", "chou", "épinard", "céleri", "betterave", "navet", "radis", "concombre", "laitue", "endive", "champignon", "asperge", "artichaut", "fenouil"],
+  fruit:       ["pomme", "poire", "banane", "orange", "citron", "fraise", "cerise", "raisin", "pêche", "abricot", "mangue", "ananas", "kiwi", "melon", "framboise", "figue", "datte", "prune", "avocat"],
+  noix:        ["amande", "noisette", "pistache", "cajou", "arachide", "cacahuète", "graine de sésame", "graine de tournesol", "graine de lin", "graine de chia", "noix de coco", "noix de cajou"],
+  epice:       ["sel", "poivre", "cannelle", "cumin", "curcuma", "paprika", "coriandre", "gingembre", "muscade", "cardamome", "curry", "thym", "romarin", "basilic", "persil", "menthe", "laurier", "safran", "vanille", "arôme", "moutarde", "vinaigre"],
+  additif:     ["phosphate", "carbonate", "nitrite", "nitrate", "sorbate", "benzoate", "citrate", "colorant", "conservateur", "émulsifiant", "stabilisant", "épaississant", "gélifiant", "antioxydant", "lécithine", "carraghénane", "gomme", "pectine", "agar", "cellulose", "maltodextrine", "bicarbonate", "levure chimique", "poudre à lever", "poudres à lever", "acide ascorbique", "acide citrique", "acide sorbique", "tocophérol", "diphosphate"],
+  legumineuse: ["lentille", "pois chiche", "haricot", "soja", "fève", "pois cassé", "lupin", "edamame", "tofu", "tempeh"],
+  oeuf:        ["œuf", "oeuf", "jaune d'œuf", "blanc d'œuf", "albumine", "ovalbumine"],
+  sucre:       ["sucre", "miel", "sirop", "caramel", "fructose", "saccharose", "glucose", "chocolat", "confiture", "dextrose"],
+  graisse:     ["huile", "margarine", "saindoux", "graisse végétale", "shortening", "beurre de cacao"],
+};
+
+/**
+ * Devine la catégorie d'un ingrédient à partir de son nom.
+ * @param {string} name - Le nom canonique de l'ingrédient
+ * @returns {string} - La catégorie devinée
+ */
+export function guessCategory(name) {
+  if (!name) return "autre";
+  const lower = name.toLowerCase();
+  // E-numbers (ex: E471, E300b)
+  if (/\be\d{3,4}[a-z]?\b/i.test(lower)) return "additif";
+  for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some(kw => lower.includes(kw))) return cat;
+  }
+  return "autre";
+}
+
 /**
  * Normalise un nom d'ingrédient vers sa forme canonique française.
  * @param {string} name - Le nom brut (peut être en anglais ou avoir des variantes)
