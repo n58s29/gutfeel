@@ -43,7 +43,32 @@ Catégories : laitier, cereale, viande, poisson, legume, fruit, noix, epice, add
   return normalizeIngredients(Array.isArray(parsed) ? parsed : []);
 }
 
+const NOTHING_PATTERNS = [
+  /\brien\b/, /\bpas mang[eé]\b/, /\bn['']ai pas mang[eé]\b/, /\bje n['']ai rien\b/,
+  /\bà jeun\b/, /\bjeûn[eé]\b/, /\bjeun[eé]\b/, /\bsauté (le |ce )?repas\b/,
+  /\bpas faim\b/, /\bskip\b/, /\bnothing\b/, /\bzéro aliment\b/, /\baucun aliment\b/,
+];
+function detectNothingEaten(text) {
+  const t = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return NOTHING_PATTERNS.some(re => re.test(t));
+}
+
+const NOTHING_DISH_NAMES = new Set(["rien", "nothing", "vide", "jeûne", "jeune", "à jeun", "a jeun", "pas de repas", "aucun repas"]);
+function sanitizeResult(result) {
+  // Si tous les plats sont des variantes de "rien", vider les ingrédients inventés
+  const plats = (result.plats || []).map(p => p.trim().toLowerCase());
+  if (plats.length > 0 && plats.every(p => NOTHING_DISH_NAMES.has(p))) {
+    return { plats: [], ingredients: [] };
+  }
+  // Retirer "rien" des plats s'il apparaît mélangé avec de vrais plats
+  return {
+    ...result,
+    plats: (result.plats || []).filter(p => !NOTHING_DISH_NAMES.has(p.trim().toLowerCase())),
+  };
+}
+
 async function decomposeWithAI(text, apiKey) {
+  if (detectNothingEaten(text)) return { plats: [], ingredients: [] };
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
@@ -59,7 +84,7 @@ Description: "${text}"` }] })
   const data = await res.json();
   const raw = data.content?.map(b => b.text || "").join("") || "";
   const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
-  return { ...parsed, ingredients: normalizeIngredients(parsed.ingredients || []) };
+  return sanitizeResult({ ...parsed, ingredients: normalizeIngredients(parsed.ingredients || []) });
 }
 
 async function lookupBarcode(code) {
@@ -369,13 +394,21 @@ export default function MieuxDemain() {
 
   async function handleAnalyze() {
     setAnalyzing(true); setError(null);
-    try { const r = await decomposeWithAI(transcript, getApiKey()); setAnalysisResult(r); setEditedIngredients(r.ingredients || []); setCurrentSource("voice"); setView("ingredients"); }
+    try {
+      const r = await decomposeWithAI(transcript, getApiKey());
+      if (!r.plats.length && !r.ingredients.length) { setError("Aucun aliment détecté. Si tu n'as rien mangé, pas besoin d'enregistrer !"); return; }
+      setAnalysisResult(r); setEditedIngredients(r.ingredients || []); setCurrentSource("voice"); setView("ingredients");
+    }
     catch (e) { setError(e.message || "Erreur analyse IA."); } finally { setAnalyzing(false); }
   }
   async function handleTextAnalyze() {
     if (!getApiKey()) { setShowSettings(true); setError("Configure ta clé API d'abord !"); return; }
     setAnalyzing(true); setError(null);
-    try { const r = await decomposeWithAI(textInput, getApiKey()); setAnalysisResult(r); setEditedIngredients(r.ingredients || []); setCurrentSource("text"); setView("ingredients"); }
+    try {
+      const r = await decomposeWithAI(textInput, getApiKey());
+      if (!r.plats.length && !r.ingredients.length) { setError("Aucun aliment détecté. Si tu n'as rien mangé, pas besoin d'enregistrer !"); return; }
+      setAnalysisResult(r); setEditedIngredients(r.ingredients || []); setCurrentSource("text"); setView("ingredients");
+    }
     catch (e) { setError(e.message || "Erreur analyse IA."); } finally { setAnalyzing(false); }
   }
   async function handleImageCapture(file, mode) {

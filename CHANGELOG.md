@@ -1,5 +1,12 @@
 # Changelog — GutFeel
 
+## v0.7.1 — 9 avril 2026
+
+### Corrections
+- **"Rien mangé" ne crée plus de plat avec ingrédients inventés** : quand l'utilisateur décrit qu'il n'a rien mangé ("rien", "pas mangé", "à jeun", "jeûné", "sauté le repas", etc.), l'appel API est court-circuité et aucune entrée n'est créée. Un message explicatif s'affiche à la place. Un post-filtre sanitise aussi les réponses LLM qui retourneraient malgré tout un plat "Rien".
+
+---
+
 ## v0.7.0 — 9 avril 2026
 
 ### Nouveau
