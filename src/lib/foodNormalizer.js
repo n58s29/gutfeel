@@ -264,7 +264,7 @@ export function guessCategory(name) {
  */
 export function normalizeIngredientName(name) {
   if (!name || typeof name !== "string") return name;
-  const lower = name.toLowerCase().trim();
+  const lower = name.toLowerCase().trim().replace(/^_+|_+$/g, "");
   // Recherche exacte
   if (SYNONYMS[lower]) return SYNONYMS[lower];
   // Retourne la version lowercase/trim si pas de synonyme trouvé

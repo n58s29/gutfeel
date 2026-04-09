@@ -1,5 +1,12 @@
 # Changelog — GutFeel
 
+## v0.7.3 — 9 avril 2026
+
+### Corrections
+- **Underscores supprimés des noms d'ingrédients** : les noms encadrés de `_` (ex. `_lait_` généré par le LLM) sont maintenant nettoyés lors de la normalisation. Ils seront unifiés avec leur forme sans underscore dans les corrélations et le FODMAP.
+
+---
+
 ## v0.7.2 — 9 avril 2026
 
 ### Corrections
