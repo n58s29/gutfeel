@@ -1,5 +1,16 @@
 # Changelog — GutFeel
 
+## v0.7.0 — 9 avril 2026
+
+### Nouveau
+- **Ajout manuel d'ingrédients en édition** : dans la vue "Modifier" d'un repas, une nouvelle zone "Ajouter un ingrédient" permet d'enrichir la liste après analyse.
+  - **Autocomplete depuis l'historique** : en tapant, un dropdown propose les ingrédients déjà rencontrés dans les repas passés (filtrés en temps réel).
+  - **Saisie libre** : taper un nom et appuyer sur `+` (ou Entrée) ajoute l'ingrédient avec catégorie devinée automatiquement.
+  - **Suggestions IA** : le bouton "Suggérer via IA" appelle Claude avec le contexte du plat, les ingrédients déjà présents et la recherche en cours — jusqu'à 8 suggestions pertinentes s'affichent dans le dropdown, taguées "IA".
+  - Le bouton IA n'est affiché que si une clé API Anthropic est configurée.
+
+---
+
 ## v0.6.1 — 2 avril 2026
 
 ### Nouveau

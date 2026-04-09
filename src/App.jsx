@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2, Search, ChevronDown, ChevronUp, Zap, Settings, Key, ExternalLink, Download, Pencil, Save, Home, ShieldAlert, BookOpen, Activity, MessageSquare, ScanLine, Type, Camera, Tag, Copy } from "lucide-react";
+import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2, Search, ChevronDown, ChevronUp, Zap, Settings, Key, ExternalLink, Download, Pencil, Save, Home, ShieldAlert, BookOpen, Activity, MessageSquare, ScanLine, Type, Camera, Tag, Copy, Plus, Sparkles } from "lucide-react";
 import { SYMPTOM_TYPES as SYMPTOM_TYPES_LIB } from "./lib/symptomTypes.js";
 import { normalizeIngredients, guessCategory } from "./lib/foodNormalizer.js";
 import SymptomForm from "./components/SymptomForm/SymptomForm.jsx";
@@ -22,6 +22,26 @@ function loadEntries() { try { return JSON.parse(localStorage.getItem(STORAGE_KE
 function persistEntries(e) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(e)); } catch {} }
 function getApiKey() { return localStorage.getItem(APIKEY_KEY) || ""; }
 function setApiKeyStore(k) { localStorage.setItem(APIKEY_KEY, k); }
+
+async function suggestIngredientsWithAI(dishContext, existingIngNames, query, apiKey) {
+  const context = dishContext ? `Plat : "${dishContext}". ` : "";
+  const existing = existingIngNames.length ? `Ingrédients déjà identifiés : ${existingIngNames.join(", ")}. ` : "";
+  const queryPart = query ? `L'utilisateur cherche : "${query}". Priorise les ingrédients correspondant à cette recherche.` : "Suggère des ingrédients supplémentaires probables.";
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 500,
+      messages: [{ role: "user", content: `Tu es un expert en nutrition. ${context}${existing}${queryPart}
+Propose jusqu'à 8 ingrédients supplémentaires NON DÉJÀ listés, en français, minuscules, singulier.
+Réponds UNIQUEMENT en JSON valide sans backticks : [{"nom":"...","categorie":"..."}]
+Catégories : laitier, cereale, viande, poisson, legume, fruit, noix, epice, additif, legumineuse, oeuf, sucre, graisse, autre` }] })
+  });
+  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err?.error?.message || `Erreur API (${res.status})`); }
+  const data = await res.json();
+  const raw = data.content?.map(b => b.text || "").join("") || "";
+  const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
+  return normalizeIngredients(Array.isArray(parsed) ? parsed : []);
+}
 
 async function decomposeWithAI(text, apiKey) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -267,8 +287,22 @@ export default function MieuxDemain() {
   const [capturedImage, setCapturedImage] = useState(null);
   const [currentSource, setCurrentSource] = useState("voice");
   const [visionMsg, setVisionMsg] = useState("");
+  const [ingSearch, setIngSearch] = useState("");
+  const [ingSearchOpen, setIngSearchOpen] = useState(false);
+  const [aiIngLoading, setAiIngLoading] = useState(false);
+  const [aiIngSuggestions, setAiIngSuggestions] = useState([]);
+  const ingSearchRef = useRef(null);
 
   const suspectsData = useMemo(() => computeSuspects(entries), [entries]);
+  const knownIngredients = useMemo(() => {
+    const map = {};
+    entries.filter(e => e.type === "meal").forEach(e => {
+      (e.ingredients || []).forEach(ing => {
+        if (ing.nom) map[ing.nom.toLowerCase()] = ing;
+      });
+    });
+    return Object.values(map).sort((a, b) => a.nom.localeCompare(b.nom));
+  }, [entries]);
 
   useEffect(() => {
     const old = localStorage.getItem("gutfeel-entries");
@@ -429,6 +463,7 @@ export default function MieuxDemain() {
     setEditPainLevel(entry.intensity || 1);
     setEditSymptom(entry.symptom || "abdominal_pain");
     setEditPortion(entry.portion || "normal");
+    setIngSearch(""); setIngSearchOpen(false); setAiIngSuggestions([]);
     setView("edit");
   }
   function saveEdit() {
@@ -443,6 +478,27 @@ export default function MieuxDemain() {
 
   function removeIngredient(idx) { setEditedIngredients(prev => prev.filter((_, i) => i !== idx)); }
   function removeEditIngredient(idx) { setEditIngredients(prev => prev.filter((_, i) => i !== idx)); }
+
+  function addIngredientToEdit(ing) {
+    setEditIngredients(prev => prev.some(e => e.nom === ing.nom) ? prev : [...prev, ing]);
+    setIngSearch(""); setIngSearchOpen(false); setAiIngSuggestions([]);
+  }
+  function addCustomIngredient() {
+    const nom = ingSearch.trim().toLowerCase();
+    if (!nom) return;
+    addIngredientToEdit({ nom, categorie: guessCategory(nom) });
+  }
+  async function handleAiIngSearch() {
+    const apiKey = getApiKey();
+    if (!apiKey) return;
+    setAiIngLoading(true); setAiIngSuggestions([]);
+    try {
+      const results = await suggestIngredientsWithAI(editDishes, editIngredients.map(i => i.nom), ingSearch, apiKey);
+      setAiIngSuggestions(results);
+      setIngSearchOpen(true);
+    } catch (e) { setError(e.message); }
+    finally { setAiIngLoading(false); }
+  }
 
   function duplicateEntry(entry) {
     const { id: _id, timestamp: _ts, ...rest } = entry;
@@ -821,6 +877,69 @@ export default function MieuxDemain() {
               <p className="gf-section-label">{editIngredients.length} ingrédient{editIngredients.length>1?"s":""}</p>
               {renderIngredientList(editIngredients, removeEditIngredient)}
             </>}
+
+            {/* Add ingredient section */}
+            <p className="gf-section-label" style={{marginTop:16}}>Ajouter un ingrédient</p>
+            <div style={{marginBottom:16}}>
+              <div style={{display:"flex",gap:8,position:"relative"}}>
+                <div style={{flex:1,position:"relative"}}>
+                  <input
+                    ref={ingSearchRef}
+                    value={ingSearch}
+                    onChange={e => { setIngSearch(e.target.value); setIngSearchOpen(true); }}
+                    onFocus={() => setIngSearchOpen(true)}
+                    onBlur={() => setTimeout(() => setIngSearchOpen(false), 150)}
+                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCustomIngredient(); } if (e.key === "Escape") setIngSearchOpen(false); }}
+                    placeholder="Rechercher ou saisir un ingrédient..."
+                    style={{width:"100%",borderRadius:12,padding:"10px 36px 10px 12px",fontSize:14,border:"1.5px solid #F0E6D8",background:"#fff",fontFamily:"inherit",outline:"none"}}
+                  />
+                  <Search size={14} color="#B0A090" style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}/>
+                </div>
+                <button
+                  onClick={addCustomIngredient}
+                  disabled={!ingSearch.trim()}
+                  style={{borderRadius:12,padding:"10px 12px",background:ingSearch.trim()?"#E07A5F":"#F0E6D8",color:ingSearch.trim()?"#fff":"#B0A090",border:"none",cursor:ingSearch.trim()?"pointer":"not-allowed",display:"flex",alignItems:"center",transition:"all .15s"}}
+                  title="Ajouter cet ingrédient"
+                ><Plus size={16}/></button>
+              </div>
+
+              {/* Dropdown suggestions */}
+              {ingSearchOpen && (() => {
+                const q = ingSearch.toLowerCase().trim();
+                const historySuggestions = knownIngredients
+                  .filter(ing => !editIngredients.some(e => e.nom === ing.nom) && (!q || ing.nom.toLowerCase().includes(q)))
+                  .slice(0, 6);
+                const aiFiltered = aiIngSuggestions.filter(ing => !editIngredients.some(e => e.nom === ing.nom));
+                if (!historySuggestions.length && !aiFiltered.length) return null;
+                return (
+                  <div style={{background:"#fff",border:"1.5px solid #F0E6D8",borderRadius:12,marginTop:4,overflow:"hidden",boxShadow:"0 4px 16px rgba(0,0,0,0.08)",maxHeight:240,overflowY:"auto"}}>
+                    {aiFiltered.length > 0 && <p style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,color:"#81B29A",padding:"8px 12px 4px",fontFamily:"Sora"}}>✨ Suggestions IA</p>}
+                    {aiFiltered.map((ing, i) => (
+                      <button key={`ai-${i}`} onMouseDown={() => addIngredientToEdit(ing)}
+                        style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"8px 12px",background:"#F0FAF5",border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:13,textAlign:"left",color:"#2B2D42"}}>
+                        <span>{CAT_EMOJI[ing.categorie]||"🔹"}</span><span style={{flex:1}}>{ing.nom}</span><span style={{fontSize:10,color:"#81B29A"}}>IA</span>
+                      </button>
+                    ))}
+                    {historySuggestions.length > 0 && <p style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,color:"#8D99AE",padding:"8px 12px 4px",fontFamily:"Sora"}}>Historique</p>}
+                    {historySuggestions.map((ing, i) => (
+                      <button key={`h-${i}`} onMouseDown={() => addIngredientToEdit(ing)}
+                        style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"8px 12px",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:13,textAlign:"left",color:"#2B2D42",borderTop:"1px solid #F5F0E8"}}>
+                        <span>{CAT_EMOJI[ing.categorie]||"🔹"}</span><span>{ing.nom}</span>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {/* AI search button */}
+              {getApiKey() && <button
+                onClick={handleAiIngSearch}
+                disabled={aiIngLoading}
+                style={{marginTop:8,width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"9px 12px",borderRadius:12,border:"1.5px dashed #81B29A",background:"#F0FAF5",color:"#4a9070",cursor:aiIngLoading?"not-allowed":"pointer",fontSize:13,fontWeight:600,fontFamily:"inherit",transition:"all .15s"}}>
+                {aiIngLoading ? <><Loader2 size={14} className="gf-spin"/> Recherche en cours…</> : <><Sparkles size={14}/> Suggérer via IA</>}
+              </button>}
+            </div>
+
             {editingEntry.transcript && <div style={{marginTop:16}}><p className="gf-section-label">Transcript</p><p style={{fontSize:12,color:"#8D99AE",fontStyle:"italic",padding:"8px 12px",borderRadius:12,background:"#F5F0E8"}}>"{editingEntry.transcript}"</p></div>}
           </>}
         </div>
