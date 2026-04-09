@@ -53,6 +53,7 @@ git push -u origin main
 4. **Scanne un produit** : code-barres via caméra ou saisie manuelle
 5. **Note une douleur** : bouton "Aïe !" avec 3 niveaux d'intensité
 6. **Enrichis un repas** : clique "Modifier" sur n'importe quelle entrée pour ajouter des ingrédients oubliés — via l'historique, la saisie libre, ou une suggestion IA
+7. **Comprends l'analyse** : dans l'onglet Analyse, le bouton "💡 Comment ça marche ?" explique la logique de corrélation, les badges de suspicion et la vue FODMAP
 
 ## 🏗️ Stack technique
 

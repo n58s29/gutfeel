@@ -1,5 +1,12 @@
 # Changelog — GutFeel
 
+## v0.8.0 — 9 avril 2026
+
+### Nouveau
+- **Bouton "Comment ça marche ?" sur l'onglet Analyse** : un bouton discret en haut à droite de l'onglet ouvre un bottom sheet pédagogique. Il explique pas à pas la logique de corrélation (fenêtre 24h, score d'impact, badges de suspicion), la vue FODMAP, le graphique de chronologie (lag), et rappelle les limites de l'analyse (pas un diagnostic médical).
+
+---
+
 ## v0.7.3 — 9 avril 2026
 
 ### Corrections
