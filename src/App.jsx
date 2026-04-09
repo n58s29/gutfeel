@@ -246,7 +246,7 @@ function EntryCard({ entry, onDelete, onEdit, onDuplicate }) {
       )}
       {open && (
         <div style={{display:"flex",gap:8,marginTop:8,justifyContent:"flex-end"}}>
-          {!isPain && onDuplicate && <button onClick={ev=>{ev.stopPropagation();onDuplicate(entry)}} className="gf-action-btn" style={{background:"#EEEDFE",color:"#534AB7"}}><Copy size={12}/> Re-manger</button>}
+          {!isPain && onDuplicate && <button onClick={ev=>{ev.stopPropagation();onDuplicate(entry)}} className="gf-action-btn" style={{background:"#EEEDFE",color:"#534AB7"}}><Copy size={12}/> Copier</button>}
           {onEdit && <button onClick={ev=>{ev.stopPropagation();onEdit(entry)}} className="gf-action-btn" style={{background:"#F0E6D8",color:"#8D6E4C"}}><Pencil size={12}/> Modifier</button>}
           {onDelete && <button onClick={ev=>{ev.stopPropagation();onDelete(entry.id)}} className="gf-action-btn" style={{background:"#FFF0F0",color:"#E63946"}}><Trash2 size={12}/> Supprimer</button>}
         </div>

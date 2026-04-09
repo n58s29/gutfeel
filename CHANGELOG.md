@@ -1,5 +1,12 @@
 # Changelog — GutFeel
 
+## v0.7.2 — 9 avril 2026
+
+### Corrections
+- **Bouton "Re-manger" renommé "Copier"** : libellé plus court et plus neutre.
+
+---
+
 ## v0.7.1 — 9 avril 2026
 
 ### Corrections
