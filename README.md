@@ -78,3 +78,4 @@ Ouvre `http://localhost:5173/gutfeel/` dans Chrome.
 - Le scan code-barres natif fonctionne sur **Chrome Android/Desktop**. Sur iOS, utilise la saisie manuelle.
 - La reconnaissance vocale nécessite **Chrome** (Web Speech API).
 - La clé API est stockée uniquement dans ton navigateur, jamais transmise ailleurs que l'API Anthropic.
+- Le bouton Retour Android fonctionne naturellement : il ferme l'écran actif (enregistrement, modification, paramètres…) sans quitter l'app.
