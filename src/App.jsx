@@ -366,6 +366,49 @@ export default function MieuxDemain() {
   }, []);
   useEffect(() => () => { stopCamera(); stopRecognition(); }, []);
 
+  // ── Android back button ──────────────────────────────────────────────────
+  const backStateRef = useRef({});
+  useEffect(() => {
+    backStateRef.current = { view, showSymptomForm, showPainModal, showSettings, showInfo, tab, editingEntry, currentSource };
+  });
+  const handleBackRef = useRef(null);
+  useEffect(() => {
+    handleBackRef.current = () => {
+      const s = backStateRef.current;
+      if (s.view === "recording") {
+        stopRecognition();
+        if (finalTranscriptRef.current.trim()) { setTranscript(finalTranscriptRef.current.trim()); setView("transcript"); }
+        else setView(null);
+        return true;
+      }
+      if (s.view === "ingredients") {
+        if (s.currentSource === "voice") setView("transcript");
+        else if (s.currentSource === "text") setView("text-input");
+        else { setAnalysisResult(null); setEditedIngredients([]); setCapturedImage(null); setView(null); }
+        return true;
+      }
+      if (s.view === "edit") { setView(null); setEditingEntry(null); return true; }
+      if (s.view === "scanner") { stopCamera(); setView(null); return true; }
+      if (s.view !== null) { resetAndHome(); return true; }
+      if (s.showSymptomForm) { setShowSymptomForm(false); return true; }
+      if (s.showPainModal) { setShowPainModal(false); return true; }
+      if (s.showSettings) { setShowSettings(false); return true; }
+      if (s.showInfo) { setShowInfo(false); return true; }
+      if (s.tab !== "home") { setTab("home"); return true; }
+      return false;
+    };
+  });
+  useEffect(() => {
+    history.pushState({ gutfeel: true }, "");
+    const onPopState = () => {
+      const handled = handleBackRef.current?.();
+      if (handled) history.pushState({ gutfeel: true }, "");
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+  // ────────────────────────────────────────────────────────────────────────
+
   function updateEntries(u) { setEntries(u); persistEntries(u); }
   function showFeedback() { setSavedFeedback(true); setTimeout(() => setSavedFeedback(false), 1800); }
 

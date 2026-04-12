@@ -1,5 +1,12 @@
 # Changelog — GutFeel
 
+## v0.9.1 — 12 avril 2026
+
+### Corrections
+- **Bouton Retour Android fonctionnel** : appuyer sur le bouton Retour Android ferme désormais l'overlay ou le modal actif (enregistrement, ingrédients, modification, paramètres, formulaire de douleur…) au lieu de quitter l'app. La priorité de fermeture suit la logique naturelle : vue active → modal → onglet → sortie.
+
+---
+
 ## v0.9.0 — 12 avril 2026
 
 ### Évolution
