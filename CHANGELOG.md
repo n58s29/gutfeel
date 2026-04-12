@@ -1,5 +1,13 @@
 # Changelog — GutFeel
 
+## v0.9.0 — 12 avril 2026
+
+### Évolution
+- **Historique intégré à l'accueil** : l'onglet "Historique" est supprimé. L'onglet Journal affiche désormais la totalité des entrées (tous les jours, tous les repas), avec la barre de stats (nombre d'entrées, repas et douleurs) et le bouton d'export CSV.
+- **Bouton "Modifier" sur les repas de l'accueil** : les repas enregistrés affichent maintenant les boutons Copier, Modifier et Supprimer directement depuis l'accueil — plus besoin d'aller dans l'historique pour éditer.
+
+---
+
 ## v0.8.0 — 9 avril 2026
 
 ### Nouveau

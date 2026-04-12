@@ -52,7 +52,7 @@ git push -u origin main
 3. **Enregistre un repas** : appuie sur le micro, parle, vérifie, valide
 4. **Scanne un produit** : code-barres via caméra ou saisie manuelle
 5. **Note une douleur** : bouton "Aïe !" avec 3 niveaux d'intensité
-6. **Enrichis un repas** : clique "Modifier" sur n'importe quelle entrée pour ajouter des ingrédients oubliés — via l'historique, la saisie libre, ou une suggestion IA
+6. **Consulte et édite** : l'onglet Journal affiche tout l'historique — clique sur une entrée pour la copier, la modifier ou la supprimer
 7. **Comprends l'analyse** : dans l'onglet Analyse, le bouton "💡 Comment ça marche ?" explique la logique de corrélation, les badges de suspicion et la vue FODMAP
 
 ## 🏗️ Stack technique

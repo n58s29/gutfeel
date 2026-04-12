@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2, Search, ChevronDown, ChevronUp, Zap, Settings, Key, ExternalLink, Download, Pencil, Save, Home, ShieldAlert, BookOpen, Activity, MessageSquare, ScanLine, Type, Camera, Tag, Copy, Plus, Sparkles } from "lucide-react";
+import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2, Search, ChevronDown, ChevronUp, Zap, Settings, Key, ExternalLink, Download, Pencil, Save, Home, ShieldAlert, Activity, MessageSquare, ScanLine, Type, Camera, Tag, Copy, Plus, Sparkles } from "lucide-react";
 import { SYMPTOM_TYPES as SYMPTOM_TYPES_LIB } from "./lib/symptomTypes.js";
 import { normalizeIngredients, guessCategory } from "./lib/foodNormalizer.js";
 import SymptomForm from "./components/SymptomForm/SymptomForm.jsx";
@@ -256,7 +256,7 @@ function EntryCard({ entry, onDelete, onEdit, onDuplicate }) {
 }
 
 function BottomNav({ tab, setTab, suspectCount }) {
-  const tabs = [{ id:"home", icon:Home, label:"Journal" }, { id:"analysis", icon:Activity, label:"Analyse" }, { id:"suspects", icon:ShieldAlert, label:"Suspects", badge:suspectCount }, { id:"history", icon:BookOpen, label:"Historique" }];
+  const tabs = [{ id:"home", icon:Home, label:"Journal" }, { id:"analysis", icon:Activity, label:"Analyse" }, { id:"suspects", icon:ShieldAlert, label:"Suspects", badge:suspectCount }];
   return (
     <div className="gf-bottomnav">
       {tabs.map(t => (
@@ -506,7 +506,7 @@ export default function MieuxDemain() {
       if (e.type === "pain") return { ...e, timestamp: newTimestamp, intensity: editPainLevel, symptom: editSymptom };
       return { ...e, timestamp: newTimestamp, dishes: editDishes.split(",").map(d=>d.trim()).filter(Boolean), ingredients: editIngredients, portion: editPortion };
     });
-    updateEntries(updated); showFeedback(); setEditingEntry(null); setView(null); setTab("history");
+    updateEntries(updated); showFeedback(); setEditingEntry(null); setView(null); setTab("home");
   }
 
   function removeIngredient(idx) { setEditedIngredients(prev => prev.filter((_, i) => i !== idx)); }
@@ -625,9 +625,12 @@ export default function MieuxDemain() {
         <div className="gf-header">
           <button onClick={()=>setShowSettings(true)} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><Settings size={20} color="#8D99AE"/></button>
           <h1 className="gf-title">Mieux Demain</h1>
-          <button onClick={()=>setShowInfo(true)} style={{background:"none",border:"none",cursor:"pointer",padding:4,display:"flex",alignItems:"center",justifyContent:"center",width:28,height:28,borderRadius:"50%",color:"#8D99AE"}} aria-label="À propos">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8" strokeWidth="3"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
-          </button>
+          <div style={{display:"flex",alignItems:"center",gap:4}}>
+            {entries.length > 0 && <button onClick={()=>exportCSV(entries)} style={{display:"flex",alignItems:"center",gap:3,fontSize:12,fontWeight:600,color:"#E07A5F",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",padding:4}}><Download size={14}/> CSV</button>}
+            <button onClick={()=>setShowInfo(true)} style={{background:"none",border:"none",cursor:"pointer",padding:4,display:"flex",alignItems:"center",justifyContent:"center",width:28,height:28,borderRadius:"50%",color:"#8D99AE"}} aria-label="À propos">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8" strokeWidth="3"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
+            </button>
+          </div>
         </div>
         <div className="gf-scroll" style={{paddingTop:16}}>
           {/* Carte 1 — Décrivez votre repas */}
@@ -679,7 +682,7 @@ export default function MieuxDemain() {
           </div>
           <button className="gf-btn-pain" style={{width:"100%",marginBottom:20}} onClick={()=>setShowSymptomForm(true)}><Frown size={20}/> Signaler une douleur</button>
           {entries.length === 0 ? <div style={{textAlign:"center",padding:"24px 0"}}><p style={{fontSize:32,marginBottom:8}}>🌱</p><p style={{fontWeight:600,fontSize:14,color:"#8D99AE"}}>Ton journal est vide</p><p style={{fontSize:12,marginTop:4,color:"#B0B8C8"}}>Commence par noter ce que tu as mangé</p></div>
-          : Object.entries(grouped).slice(0,3).map(([day,items]) => <div key={day} style={{marginBottom:16}}><p className="gf-section-label">{day}</p>{items.slice(0,5).map(e => <EntryCard key={e.id} entry={e} onDuplicate={duplicateEntry}/>)}</div>)}
+          : <>{<div style={{marginBottom:12,padding:"8px 12px",borderRadius:12,background:"#F5F0E8",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span style={{fontSize:13,fontWeight:600,color:"#8D6E4C"}}>{entries.length} entrée{entries.length>1?"s":""}</span><span style={{fontSize:12,color:"#B0A090"}}>{entries.filter(e=>e.type==="meal").length} repas · {entries.filter(e=>e.type==="pain").length} douleurs</span></div>}{Object.entries(grouped).map(([day,items]) => <div key={day} style={{marginBottom:16}}><p className="gf-section-label">{day}</p>{items.map(e => <EntryCard key={e.id} entry={e} onDelete={deleteEntry} onEdit={startEdit} onDuplicate={duplicateEntry}/>)}</div>)}</>}
         </div>
       </>}
 
@@ -719,20 +722,6 @@ export default function MieuxDemain() {
               </div>
             ); })}
           </>}
-        </div>
-      </>}
-
-      {/* ═══ TAB: HISTORY ═══ */}
-      {showingTab && tab === "history" && <>
-        <div className="gf-header">
-          <div style={{width:28}}/>
-          <h1 className="gf-title">Historique</h1>
-          {entries.length > 0 ? <button onClick={()=>exportCSV(entries)} style={{display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:600,color:"#E07A5F",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit"}}><Download size={15}/> CSV</button> : <div style={{width:60}}/>}
-        </div>
-        <div className="gf-scroll" style={{paddingTop:12}}>
-          {entries.length === 0 ? <div style={{textAlign:"center",padding:"48px 0"}}><p style={{fontSize:32,marginBottom:8}}>📋</p><p style={{fontWeight:600,fontSize:14,color:"#8D99AE"}}>Rien pour l'instant</p></div>
-          : <>{<div style={{marginBottom:12,padding:"8px 12px",borderRadius:12,background:"#F5F0E8",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span style={{fontSize:13,fontWeight:600,color:"#8D6E4C"}}>{entries.length} entrée{entries.length>1?"s":""}</span><span style={{fontSize:12,color:"#B0A090"}}>{entries.filter(e=>e.type==="meal").length} repas · {entries.filter(e=>e.type==="pain").length} douleurs</span></div>}
-            {Object.entries(grouped).map(([day,items]) => <div key={day} style={{marginBottom:20}}><p className="gf-section-label">{day}</p>{items.map(e => <EntryCard key={e.id} entry={e} onDelete={deleteEntry} onEdit={startEdit} onDuplicate={duplicateEntry}/>)}</div>)}</>}
         </div>
       </>}
 
