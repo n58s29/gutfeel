@@ -1,5 +1,12 @@
 # Changelog — GutFeel
 
+## v0.9.2 — 13 avril 2026
+
+### Corrections
+- **Messages d'erreur API traduits en français** : les erreurs retournées par l'API Claude ("Overloaded", 401, 429…) sont désormais reformulées en français avec un message clair et actionnable (ex. "L'IA est surchargée en ce moment. Réessaie dans quelques secondes.").
+
+---
+
 ## v0.9.1 — 12 avril 2026
 
 ### Corrections
