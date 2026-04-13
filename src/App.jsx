@@ -22,6 +22,14 @@ function loadEntries() { try { return JSON.parse(localStorage.getItem(STORAGE_KE
 function persistEntries(e) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(e)); } catch {} }
 function getApiKey() { return localStorage.getItem(APIKEY_KEY) || ""; }
 function setApiKeyStore(k) { localStorage.setItem(APIKEY_KEY, k); }
+function humanizeApiError(err, status) {
+  const type = err?.error?.type || "";
+  const msg = err?.error?.message || "";
+  if (type === "overloaded_error" || msg.toLowerCase() === "overloaded") return "L'IA est surchargée en ce moment. Réessaie dans quelques secondes.";
+  if (status === 401 || type === "authentication_error") return "Clé API invalide. Vérifie ta clé dans les réglages.";
+  if (status === 429 || type === "rate_limit_error") return "Trop de requêtes. Attends un moment avant de réessayer.";
+  return msg || `Erreur API (${status})`;
+}
 
 async function suggestIngredientsWithAI(dishContext, existingIngNames, query, apiKey) {
   const context = dishContext ? `Plat : "${dishContext}". ` : "";
@@ -36,7 +44,7 @@ Propose jusqu'à 8 ingrédients supplémentaires NON DÉJÀ listés, en françai
 Réponds UNIQUEMENT en JSON valide sans backticks : [{"nom":"...","categorie":"..."}]
 Catégories : laitier, cereale, viande, poisson, legume, fruit, noix, epice, additif, legumineuse, oeuf, sucre, graisse, autre` }] })
   });
-  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err?.error?.message || `Erreur API (${res.status})`); }
+  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(humanizeApiError(err, res.status)); }
   const data = await res.json();
   const raw = data.content?.map(b => b.text || "").join("") || "";
   const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
@@ -80,7 +88,7 @@ Réponds UNIQUEMENT en JSON valide sans backticks:
 Catégories: laitier, cereale, viande, poisson, legume, fruit, noix, epice, additif, legumineuse, oeuf, sucre, graisse, autre
 Description: "${text}"` }] })
   });
-  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err?.error?.message || `Erreur API (${res.status})`); }
+  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(humanizeApiError(err, res.status)); }
   const data = await res.json();
   const raw = data.content?.map(b => b.text || "").join("") || "";
   const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
@@ -128,7 +136,7 @@ async function analyzeImageWithAI(base64Data, mode, apiKey) {
       ]}]
     })
   });
-  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err?.error?.message || `Erreur API (${res.status})`); }
+  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(humanizeApiError(err, res.status)); }
   const data = await res.json();
   const raw = data.content?.map(b => b.text || "").join("") || "";
   const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
