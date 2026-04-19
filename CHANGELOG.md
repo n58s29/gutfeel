@@ -1,5 +1,15 @@
 # Changelog — GutFeel
 
+## v0.9.4 — 19 avril 2026
+
+### Corrections
+- **Français forcé partout pour les ingrédients** : triple verrou sur la langue française.
+  - *Code-barres (Open Food Facts)* : le fallback utilise désormais `ingredients_text_fr` découpé par virgule avant de recourir aux ingrédients toutes langues. Les champs `additives_tags` et `allergens_tags` sont nettoyés de tout préfixe de langue (`en:`, `fr:`…). Le texte de composition affiche `ingredients_text_fr` en priorité et se rabat sur `ingredients_text` si absent.
+  - *Sauvegarde produit scanné* : les noms d'ingrédients passent désormais par `normalizeIngredientName` (dictionnaire de traduction anglais → français) avant stockage, évitant les anglicismes résiduels ("chicken" → "poulet", "wheat flour" → "farine de blé"…).
+  - *Prompts Claude (voix, image étiquette, image repas, suggestions)* : instruction renforcée avec contre-exemples explicites — "N'utilise JAMAIS de mots anglais".
+
+---
+
 ## v0.9.3 — 19 avril 2026
 
 ### Corrections

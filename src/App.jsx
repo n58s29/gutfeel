@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2, Search, ChevronDown, ChevronUp, Zap, Settings, Key, ExternalLink, Download, Pencil, Save, Home, ShieldAlert, Activity, MessageSquare, ScanLine, Type, Camera, Tag, Copy, Plus, Sparkles } from "lucide-react";
 import { SYMPTOM_TYPES as SYMPTOM_TYPES_LIB } from "./lib/symptomTypes.js";
-import { normalizeIngredients, guessCategory } from "./lib/foodNormalizer.js";
+import { normalizeIngredients, normalizeIngredientName, guessCategory } from "./lib/foodNormalizer.js";
 import SymptomForm from "./components/SymptomForm/SymptomForm.jsx";
 import AnalysisDashboard from "./components/Analysis/AnalysisDashboard.jsx";
 import InfoPanel from "./components/InfoPanel.jsx";
@@ -40,7 +40,7 @@ async function suggestIngredientsWithAI(dishContext, existingIngNames, query, ap
     headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
     body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 500,
       messages: [{ role: "user", content: `Tu es un expert en nutrition. ${context}${existing}${queryPart}
-Propose jusqu'à 8 ingrédients supplémentaires NON DÉJÀ listés, en français, minuscules, singulier.
+Propose jusqu'à 8 ingrédients supplémentaires NON DÉJÀ listés, OBLIGATOIREMENT en français, minuscules, singulier. N'utilise JAMAIS de mots anglais.
 Réponds UNIQUEMENT en JSON valide sans backticks : [{"nom":"...","categorie":"..."}]
 Catégories : laitier, cereale, viande, poisson, legume, fruit, noix, epice, additif, legumineuse, oeuf, sucre, graisse, autre` }] })
   });
@@ -82,7 +82,7 @@ async function decomposeWithAI(text, apiKey) {
     headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
     body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000,
       messages: [{ role: "user", content: `Tu es un expert en nutrition. L'utilisateur décrit ce qu'il a mangé. Identifie TOUS les ingrédients élémentaires (non transformés). Inclus les ingrédients "cachés" courants et les additifs probables si produit industriel.
-IMPORTANT : Les noms d'ingrédients doivent TOUJOURS être en français, en minuscules, au singulier. Exemple : "poulet", "farine de blé", "huile d'olive".
+IMPORTANT : Les noms d'ingrédients doivent TOUJOURS être en français, en minuscules, au singulier. N'utilise JAMAIS de mots anglais. Exemple : "poulet" (pas "chicken"), "farine de blé" (pas "wheat flour"), "huile d'olive".
 Réponds UNIQUEMENT en JSON valide sans backticks:
 {"plats":["nom1","nom2"],"ingredients":[{"nom":"farine de blé","categorie":"cereale"}]}
 Catégories: laitier, cereale, viande, poisson, legume, fruit, noix, epice, additif, legumineuse, oeuf, sucre, graisse, autre
@@ -101,8 +101,9 @@ async function lookupBarcode(code) {
   if (data.status !== 1) return null;
   const p = data.product;
   const frIngredients = (p.ingredients || []).filter(i => !i.lang || i.lang === "fr").map(i => i.text);
-  const allIngredients = frIngredients.length > 0 ? frIngredients : (p.ingredients || []).map(i => i.text);
-  return { name: p.product_name_fr || p.product_name || "Produit inconnu", image: p.image_front_url || p.image_url || null, ingredients_text: p.ingredients_text_fr || "", ingredients: allIngredients, additives: (p.additives_tags || []).map(t => t.replace("en:", "")), allergens: (p.allergens_tags || []).map(t => t.replace("en:", "")), brands: p.brands || "", barcode: code };
+  const frTextIngredients = (p.ingredients_text_fr || "").split(/[,;]/).map(s => s.replace(/\(.*?\)/g, "").trim()).filter(s => s.length > 1 && !/^\d/.test(s));
+  const allIngredients = frIngredients.length > 0 ? frIngredients : frTextIngredients.length > 0 ? frTextIngredients : (p.ingredients || []).map(i => i.text);
+  return { name: p.product_name_fr || p.product_name || "Produit inconnu", image: p.image_front_url || p.image_url || null, ingredients_text: p.ingredients_text_fr || p.ingredients_text || "", ingredients: allIngredients, additives: (p.additives_tags || []).map(t => t.replace(/^[a-z]{2}:/, "")), allergens: (p.allergens_tags || []).map(t => t.replace(/^[a-z]{2}:/, "")), brands: p.brands || "", barcode: code };
 }
 
 async function compressImage(file) {
@@ -126,8 +127,8 @@ async function compressImage(file) {
 
 async function analyzeImageWithAI(base64Data, mode, apiKey) {
   const prompt = mode === "label"
-    ? `Tu es un expert en nutrition et en OCR.\nCette photo montre la liste des ingrédients d'un produit alimentaire.\n1. Extrais le texte de la liste d'ingrédients visible sur l'image.\n2. Décompose chaque ingrédient individuellement (sépare les ingrédients composés).\n3. Catégorise chaque ingrédient parmi : laitier, cereale, viande, poisson, legume, fruit, noix, epice, additif, legumineuse, oeuf, sucre, graisse, autre.\nIMPORTANT : Les noms doivent TOUJOURS être en français, en minuscules, au singulier.\nRéponds UNIQUEMENT en JSON : [{"nom": "...", "categorie": "..."}]\nPas de markdown, pas de commentaire, juste le JSON.`
-    : `Tu es un expert en nutrition. Analyse cette photo d'assiette/repas.\nIdentifie tous les ingrédients visibles et probables.\nPour chaque ingrédient, donne son nom et sa catégorie parmi : laitier, cereale, viande, poisson, legume, fruit, noix, epice, additif, legumineuse, oeuf, sucre, graisse, autre.\nIMPORTANT : Les noms doivent TOUJOURS être en français, en minuscules, au singulier.\nRéponds UNIQUEMENT en JSON : [{"nom": "...", "categorie": "..."}]\nPas de markdown, pas de commentaire, juste le JSON.`;
+    ? `Tu es un expert en nutrition et en OCR.\nCette photo montre la liste des ingrédients d'un produit alimentaire.\n1. Extrais le texte de la liste d'ingrédients visible sur l'image.\n2. Décompose chaque ingrédient individuellement (sépare les ingrédients composés).\n3. Catégorise chaque ingrédient parmi : laitier, cereale, viande, poisson, legume, fruit, noix, epice, additif, legumineuse, oeuf, sucre, graisse, autre.\nIMPORTANT : Les noms doivent TOUJOURS être en français, en minuscules, au singulier. N'utilise JAMAIS de mots anglais (ex: "chicken" → "poulet", "wheat flour" → "farine de blé").\nRéponds UNIQUEMENT en JSON : [{"nom": "...", "categorie": "..."}]\nPas de markdown, pas de commentaire, juste le JSON.`
+    : `Tu es un expert en nutrition. Analyse cette photo d'assiette/repas.\nIdentifie tous les ingrédients visibles et probables.\nPour chaque ingrédient, donne son nom et sa catégorie parmi : laitier, cereale, viande, poisson, legume, fruit, noix, epice, additif, legumineuse, oeuf, sucre, graisse, autre.\nIMPORTANT : Les noms doivent TOUJOURS être en français, en minuscules, au singulier. N'utilise JAMAIS de mots anglais (ex: "chicken" → "poulet", "wheat flour" → "farine de blé").\nRéponds UNIQUEMENT en JSON : [{"nom": "...", "categorie": "..."}]\nPas de markdown, pas de commentaire, juste le JSON.`;
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
@@ -508,7 +509,7 @@ export default function MieuxDemain() {
     catch { setError("Erreur recherche produit."); } finally { setBarcodeLoading(false); }
   }
   function saveProductEntry() {
-    const ings = (productResult.ingredients || []).map(n => { const nom = n.toLowerCase(); return { nom, categorie: guessCategory(nom) }; });
+    const ings = (productResult.ingredients || []).map(n => { const nom = normalizeIngredientName(n.toLowerCase()); return { nom, categorie: guessCategory(nom) }; });
     updateEntries([{ id: genId(), timestamp: new Date().toISOString(), type: "meal", source: "barcode", product_name: productResult.name, barcode: productResult.barcode, brands: productResult.brands, dishes: [productResult.name], ingredients: ings, additives: productResult.additives, allergens: productResult.allergens, portion }, ...entries]);
     showFeedback(); resetAndHome();
   }

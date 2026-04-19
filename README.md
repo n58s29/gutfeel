@@ -79,3 +79,4 @@ Ouvre `http://localhost:5173/gutfeel/` dans Chrome.
 - La reconnaissance vocale nécessite **Chrome** (Web Speech API).
 - La clé API est stockée uniquement dans ton navigateur, jamais transmise ailleurs que l'API Anthropic.
 - Le bouton Retour Android fonctionne naturellement : il ferme l'écran actif (enregistrement, modification, paramètres…) sans quitter l'app.
+- Les ingrédients sont toujours en français : via `lc=fr` sur Open Food Facts, la priorité aux champs `_fr`, la traduction automatique des anglicismes résiduels, et les consignes strictes dans les prompts Claude.
