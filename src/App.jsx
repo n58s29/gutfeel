@@ -96,11 +96,13 @@ Description: "${text}"` }] })
 }
 
 async function lookupBarcode(code) {
-  const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`);
+  const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?lc=fr&fields=product_name,product_name_fr,image_front_url,image_url,ingredients_text,ingredients_text_fr,ingredients,additives_tags,allergens_tags,brands`);
   const data = await res.json();
   if (data.status !== 1) return null;
   const p = data.product;
-  return { name: p.product_name_fr || p.product_name || "Produit inconnu", image: p.image_front_url || p.image_url || null, ingredients_text: p.ingredients_text_fr || p.ingredients_text || "", ingredients: (p.ingredients || []).map(i => i.text), additives: (p.additives_tags || []).map(t => t.replace("en:", "")), allergens: (p.allergens_tags || []).map(t => t.replace("en:", "")), brands: p.brands || "", barcode: code };
+  const frIngredients = (p.ingredients || []).filter(i => !i.lang || i.lang === "fr").map(i => i.text);
+  const allIngredients = frIngredients.length > 0 ? frIngredients : (p.ingredients || []).map(i => i.text);
+  return { name: p.product_name_fr || p.product_name || "Produit inconnu", image: p.image_front_url || p.image_url || null, ingredients_text: p.ingredients_text_fr || "", ingredients: allIngredients, additives: (p.additives_tags || []).map(t => t.replace("en:", "")), allergens: (p.allergens_tags || []).map(t => t.replace("en:", "")), brands: p.brands || "", barcode: code };
 }
 
 async function compressImage(file) {

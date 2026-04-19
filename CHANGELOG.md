@@ -1,5 +1,12 @@
 # Changelog — GutFeel
 
+## v0.9.3 — 19 avril 2026
+
+### Corrections
+- **Ingrédients en français lors du scan code-barres** : l'appel à l'API Open Food Facts spécifie désormais `lc=fr` pour forcer la langue française. Le fallback sur `ingredients_text` (qui pouvait être en allemand ou toute autre langue) est supprimé — seul `ingredients_text_fr` est utilisé. Le tableau d'ingrédients est filtré pour ne conserver que les entrées taguées `lang: fr`.
+
+---
+
 ## v0.9.2 — 13 avril 2026
 
 ### Corrections
