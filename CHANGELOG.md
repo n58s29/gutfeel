@@ -1,5 +1,19 @@
 # Changelog — GutFeel
 
+## v0.9.6 — 25 avril 2026
+
+### Corrections
+- **Anciennes entrées scan code-barres re-traduites en français** (ticket [#2](TICKETS.md)). Les entrées scannées avant v0.9.4 (notamment Nature Valley) gardaient des noms anglais (`peanuts`, `soy protein`, `glucose syrup`…) car la normalisation n'était pas appliquée au flux barcode à l'époque, et la migration v1 ne se rejoue pas. Ajout d'une migration v3 (`mieuxdemain-migration-v3-renormalize`) qui re-passe `normalizeIngredientName` sur tous les ingrédients de tous les repas existants, avec dédup par nom canonique au passage. Idempotente.
+
+---
+
+## v0.9.5 — 25 avril 2026
+
+### Corrections
+- **Scan code-barres : nettoyage des ingrédients parasites et des doublons** (ticket [#1](TICKETS.md)). Open Food Facts renvoyait parfois comme "ingrédients" des mentions d'origine (`• tous ces légumes sont cultivés en france`), des phrases d'exception (`hormis les champignons`) ou des footnotes. Ajout d'un filtre `isLikelyIngredient` qui rejette : préfixes `•`/`*`, mots-clés d'exception (`hormis`, `sauf`, `excepté`…), mentions d'origine (`cultivé`, `origine`, `provenance`…), phrases complètes (verbes conjugués `sont`/`peut`/`contient`…), et chaînes de plus de 6 mots. Ajout d'une déduplication post-normalisation dans `saveProductEntry` pour fusionner `oignon` / `oignons` / `oignon` (préserve l'ordre d'apparition).
+
+---
+
 ## v0.9.4 — 19 avril 2026
 
 ### Corrections

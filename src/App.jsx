@@ -16,6 +16,7 @@ const STORAGE_KEY = "mieuxdemain-entries";
 const APIKEY_KEY = "mieuxdemain-apikey";
 const MIGRATION_KEY = "mieuxdemain-migration-v1-food-normalize";
 const MIGRATION_KEY_V2 = "mieuxdemain-migration-v2-barcode-cats";
+const MIGRATION_KEY_V3 = "mieuxdemain-migration-v3-renormalize";
 const LOOKBACK_HOURS = 24;
 
 function loadEntries() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; } }
@@ -95,14 +96,32 @@ Description: "${text}"` }] })
   return sanitizeResult({ ...parsed, ingredients: normalizeIngredients(parsed.ingredients || []) });
 }
 
+// Filtre les chaînes qui ne sont pas des ingrédients (mentions d'origine,
+// exceptions, footnotes, phrases complètes) — souvent renvoyées par OFF.
+function isLikelyIngredient(raw) {
+  if (!raw || typeof raw !== "string") return false;
+  const s = raw.trim();
+  if (s.length < 2) return false;
+  if (/^[•*()]/.test(s)) return false;
+  if (/^\d/.test(s)) return false;
+  const lower = s.toLowerCase();
+  if (/\b(hormis|sauf|excepté|exceptée|à l['’]exception|à l['’]exclusion)\b/.test(lower)) return false;
+  if (/\b(cultiv[ée]s?|élev[ée]s?|origine|provenance|issus? de|agriculture)\b/.test(lower)) return false;
+  if (/\b(sont|est|peut|proviennent|garantit|ont été|contient|contiennent|fabriqué|conditionné)\b/.test(lower)) return false;
+  if (/peut contenir|traces? de|présence éventuelle/.test(lower)) return false;
+  if (s.split(/\s+/).length > 6) return false;
+  return true;
+}
+
 async function lookupBarcode(code) {
   const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?lc=fr&fields=product_name,product_name_fr,image_front_url,image_url,ingredients_text,ingredients_text_fr,ingredients,additives_tags,allergens_tags,brands`);
   const data = await res.json();
   if (data.status !== 1) return null;
   const p = data.product;
-  const frIngredients = (p.ingredients || []).filter(i => !i.lang || i.lang === "fr").map(i => i.text);
-  const frTextIngredients = (p.ingredients_text_fr || "").split(/[,;]/).map(s => s.replace(/\(.*?\)/g, "").trim()).filter(s => s.length > 1 && !/^\d/.test(s));
-  const allIngredients = frIngredients.length > 0 ? frIngredients : frTextIngredients.length > 0 ? frTextIngredients : (p.ingredients || []).map(i => i.text);
+  const frIngredients = (p.ingredients || []).filter(i => !i.lang || i.lang === "fr").map(i => i.text).filter(isLikelyIngredient);
+  const frTextIngredients = (p.ingredients_text_fr || "").split(/[,;]/).map(s => s.replace(/\(.*?\)/g, "").trim()).filter(isLikelyIngredient);
+  const fallbackIngredients = (p.ingredients || []).map(i => i.text).filter(isLikelyIngredient);
+  const allIngredients = frIngredients.length > 0 ? frIngredients : frTextIngredients.length > 0 ? frTextIngredients : fallbackIngredients;
   return { name: p.product_name_fr || p.product_name || "Produit inconnu", image: p.image_front_url || p.image_url || null, ingredients_text: p.ingredients_text_fr || p.ingredients_text || "", ingredients: allIngredients, additives: (p.additives_tags || []).map(t => t.replace(/^[a-z]{2}:/, "")), allergens: (p.allergens_tags || []).map(t => t.replace(/^[a-z]{2}:/, "")), brands: p.brands || "", barcode: code };
 }
 
@@ -372,6 +391,27 @@ export default function MieuxDemain() {
       } catch {}
       localStorage.setItem(MIGRATION_KEY_V2, "1");
     }
+    // Migration v3 : re-normalise rétroactivement (anglicismes Nature Valley & co.
+    // passés avant v0.9.4) + dédup par nom canonique. v1 ne se rejoue pas.
+    if (!localStorage.getItem(MIGRATION_KEY_V3)) {
+      try {
+        const raw = loadEntries();
+        const migrated = raw.map(e => {
+          if (e.type !== "meal" || !e.ingredients?.length) return e;
+          const seen = new Set();
+          const ings = e.ingredients.reduce((acc, ing) => {
+            const nom = normalizeIngredientName(ing.nom);
+            if (!nom || seen.has(nom)) return acc;
+            seen.add(nom);
+            acc.push({ ...ing, nom });
+            return acc;
+          }, []);
+          return { ...e, ingredients: ings };
+        });
+        persistEntries(migrated);
+      } catch {}
+      localStorage.setItem(MIGRATION_KEY_V3, "1");
+    }
     setEntries(loadEntries()); setApiKeyInput(getApiKey()); setHasBarcodeAPI("BarcodeDetector" in window);
     if (!getApiKey()) setShowSettings(true);
   }, []);
@@ -509,7 +549,14 @@ export default function MieuxDemain() {
     catch { setError("Erreur recherche produit."); } finally { setBarcodeLoading(false); }
   }
   function saveProductEntry() {
-    const ings = (productResult.ingredients || []).map(n => { const nom = normalizeIngredientName(n.toLowerCase()); return { nom, categorie: guessCategory(nom) }; });
+    const seen = new Set();
+    const ings = (productResult.ingredients || []).reduce((acc, n) => {
+      const nom = normalizeIngredientName(n.toLowerCase());
+      if (!nom || seen.has(nom)) return acc;
+      seen.add(nom);
+      acc.push({ nom, categorie: guessCategory(nom) });
+      return acc;
+    }, []);
     updateEntries([{ id: genId(), timestamp: new Date().toISOString(), type: "meal", source: "barcode", product_name: productResult.name, barcode: productResult.barcode, brands: productResult.brands, dishes: [productResult.name], ingredients: ings, additives: productResult.additives, allergens: productResult.allergens, portion }, ...entries]);
     showFeedback(); resetAndHome();
   }
