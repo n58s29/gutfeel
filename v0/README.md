@@ -54,6 +54,7 @@ git push -u origin main
 5. **Note une douleur** : bouton "Aïe !" avec 3 niveaux d'intensité
 6. **Consulte et édite** : l'onglet Journal affiche tout l'historique — clique sur une entrée pour la copier, la modifier ou la supprimer
 7. **Comprends l'analyse** : dans l'onglet Analyse, le bouton "💡 Comment ça marche ?" explique la logique de corrélation, les badges de suspicion et la vue FODMAP
+8. **Sauvegarde tes données** : depuis ⚙️ Configuration, section "Mes données", **Exporter** télécharge un fichier JSON daté avec tout ton localStorage (repas, douleurs, clé API, flags de migration), **Importer** restaure un fichier précédemment exporté. À utiliser avant les futures mises à jour majeures (v1) ou pour transférer tes données d'un appareil à l'autre. L'export CSV existant (Journal) reste disponible pour les analyses externes.
 
 ## 🏗️ Stack technique
 

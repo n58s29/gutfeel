@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2, Search, ChevronDown, ChevronUp, Zap, Settings, Key, ExternalLink, Download, Pencil, Save, Home, ShieldAlert, Activity, MessageSquare, ScanLine, Type, Camera, Tag, Copy, Plus, Sparkles } from "lucide-react";
+import { Mic, MicOff, ScanBarcode, Frown, ChevronLeft, Check, X, Trash2, Loader2, Search, ChevronDown, ChevronUp, Zap, Settings, Key, ExternalLink, Download, Upload, Pencil, Save, Home, ShieldAlert, Activity, MessageSquare, ScanLine, Type, Camera, Tag, Copy, Plus, Sparkles } from "lucide-react";
 import { SYMPTOM_TYPES as SYMPTOM_TYPES_LIB } from "./lib/symptomTypes.js";
 import { normalizeIngredients, normalizeIngredientName, guessCategory } from "./lib/foodNormalizer.js";
 import SymptomForm from "./components/SymptomForm/SymptomForm.jsx";
 import AnalysisDashboard from "./components/Analysis/AnalysisDashboard.jsx";
 import InfoPanel from "./components/InfoPanel.jsx";
+import pkg from "../package.json";
 
 const CAT_EMOJI = { laitier:"🥛", cereale:"🌾", viande:"🥩", poisson:"🐟", legume:"🥦", fruit:"🍎", noix:"🥜", epice:"🌶️", additif:"🧪", legumineuse:"🫘", oeuf:"🥚", sucre:"🍬", graisse:"🫒", autre:"🔹" };
 const CAT_LABEL = { laitier:"Produits laitiers", cereale:"Céréales & Gluten", viande:"Viandes", poisson:"Poissons", legume:"Légumes", fruit:"Fruits", noix:"Noix & Graines", epice:"Épices & Condiments", additif:"Additifs", legumineuse:"Légumineuses", oeuf:"Œufs", sucre:"Sucres", graisse:"Huiles & Graisses", autre:"Autres" };
@@ -17,6 +18,7 @@ const APIKEY_KEY = "mieuxdemain-apikey";
 const MIGRATION_KEY = "mieuxdemain-migration-v1-food-normalize";
 const MIGRATION_KEY_V2 = "mieuxdemain-migration-v2-barcode-cats";
 const MIGRATION_KEY_V3 = "mieuxdemain-migration-v3-renormalize";
+const NOTICE_KEY_V010 = "mieuxdemain-notice-v0.10.0-backup";
 const LOOKBACK_HOURS = 24;
 
 function loadEntries() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; } }
@@ -226,6 +228,81 @@ function exportCSV(entries) {
   a.download = `mieux_demain_${new Date().toISOString().slice(0,10)}.csv`; a.click();
 }
 
+const BACKUP_PREFIX = "mieuxdemain-";
+
+function exportBackup(version) {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(BACKUP_PREFIX)) data[k] = localStorage.getItem(k);
+  }
+  const payload = { app: "gutfeel", version, exportedAt: new Date().toISOString(), data };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `gutfeel-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Compare semver-ish "X.Y.Z" strings. Returns -1 / 0 / 1, or null if either side is malformed.
+function compareSemver(a, b) {
+  const parse = v => {
+    if (typeof v !== "string") return null;
+    const parts = v.split(".");
+    if (parts.length !== 3) return null;
+    const nums = parts.map(p => parseInt(p, 10));
+    return nums.every(n => Number.isFinite(n) && n >= 0) ? nums : null;
+  };
+  const pa = parse(a), pb = parse(b);
+  if (!pa || !pb) return null;
+  for (let i = 0; i < 3; i++) {
+    if (pa[i] !== pb[i]) return pa[i] < pb[i] ? -1 : 1;
+  }
+  return 0;
+}
+
+function importBackup(file, appVersion, onError) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let backup;
+    try { backup = JSON.parse(reader.result); }
+    catch { onError("Fichier de backup invalide"); return; }
+    if (!backup || backup.app !== "gutfeel" || !backup.data || typeof backup.data !== "object") {
+      onError("Fichier de backup invalide"); return;
+    }
+    const cmp = compareSemver(backup.version, appVersion);
+    let successMsg;
+    if (cmp === null) {
+      if (!window.confirm("Version du backup non détectée. Continuer quand même ?")) return;
+      successMsg = "Données restaurées avec succès";
+    } else if (cmp > 0) {
+      onError(`Ce backup vient d'une version plus récente (v${backup.version}) que l'app actuelle (v${appVersion}). Mets à jour l'app avant de l'importer pour éviter de corrompre tes données.`);
+      return;
+    } else if (cmp < 0) {
+      successMsg = `Backup d'une version antérieure (v${backup.version}) importé. Les migrations vont se lancer automatiquement au prochain chargement.`;
+    } else {
+      successMsg = "Données restaurées avec succès";
+    }
+    if (!window.confirm("⚠️ Cela va remplacer TOUTES tes données actuelles (repas, douleurs, clé API). Continuer ?")) return;
+    // Wipe current app keys, then restore backup keys verbatim. Migration flags
+    // are restored as-is, so the existing useEffect migrations re-run only if absent.
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(BACKUP_PREFIX)) toRemove.push(k);
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
+    Object.entries(backup.data).forEach(([k, v]) => {
+      if (typeof v === "string") localStorage.setItem(k, v);
+    });
+    window.alert(successMsg);
+    window.location.reload();
+  };
+  reader.onerror = () => onError("Lecture du fichier impossible");
+  reader.readAsText(file);
+}
+
 function SuspectBar({ pct, color }) {
   return <div style={{ width:"100%", height:6, borderRadius:3, background:"#F0E6D8", overflow:"hidden" }}><div style={{ width:`${pct}%`, height:"100%", borderRadius:3, background: color, transition:"width 0.5s ease-out" }}/></div>;
 }
@@ -316,6 +393,7 @@ export default function MieuxDemain() {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const scanIntervalRef = useRef(null);
+  const importFileRef = useRef(null);
   const [manualBarcode, setManualBarcode] = useState("");
   const [hasBarcodeAPI, setHasBarcodeAPI] = useState(false);
   const [scanningActive, setScanningActive] = useState(false);
@@ -329,6 +407,7 @@ export default function MieuxDemain() {
   const [showInfo, setShowInfo] = useState(false);
   const [savedFeedback, setSavedFeedback] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showBackupNotice, setShowBackupNotice] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [editingEntry, setEditingEntry] = useState(null);
   const [editDishes, setEditDishes] = useState("");
@@ -412,8 +491,10 @@ export default function MieuxDemain() {
       } catch {}
       localStorage.setItem(MIGRATION_KEY_V3, "1");
     }
-    setEntries(loadEntries()); setApiKeyInput(getApiKey()); setHasBarcodeAPI("BarcodeDetector" in window);
+    const loaded = loadEntries();
+    setEntries(loaded); setApiKeyInput(getApiKey()); setHasBarcodeAPI("BarcodeDetector" in window);
     if (!getApiKey()) setShowSettings(true);
+    if (loaded.length > 0 && !localStorage.getItem(NOTICE_KEY_V010)) setShowBackupNotice(true);
   }, []);
   useEffect(() => () => { stopCamera(); stopRecognition(); }, []);
 
@@ -1106,9 +1187,32 @@ export default function MieuxDemain() {
           <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style={{fontSize:12,color:"#E07A5F",display:"flex",alignItems:"center",gap:4,marginTop:8,textDecoration:"none"}}><ExternalLink size={12}/> Obtenir une clé API</a>
           {!getApiKey() && <p style={{fontSize:11,color:"#B0A090",marginTop:12,padding:"8px 10px",borderRadius:8,background:"#F5F0E8"}}>Sans clé, seul le scan code-barres et la saisie manuelle restent disponibles.</p>}
         </div>
+        <div style={{padding:"0 16px",marginTop:8}}>
+          <label style={{display:"block",fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,color:"#B0A090",marginBottom:8,fontFamily:"Sora"}}>Mes données</label>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>exportBackup(pkg.version)} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,borderRadius:12,padding:"12px 8px",fontWeight:600,fontSize:13,background:"#81B29A",color:"#fff",border:"none",cursor:"pointer",fontFamily:"inherit"}}><Download size={16}/> Exporter</button>
+            <button onClick={()=>importFileRef.current?.click()} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,borderRadius:12,padding:"12px 8px",fontWeight:600,fontSize:13,background:"#E07A5F",color:"#fff",border:"none",cursor:"pointer",fontFamily:"inherit"}}><Upload size={16}/> Importer</button>
+          </div>
+          <input ref={importFileRef} type="file" accept=".json,application/json" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(f)importBackup(f,pkg.version,setError);e.target.value="";}}/>
+          <p style={{fontSize:11,color:"#8D99AE",marginTop:8}}>💾 Sauvegarde toutes tes données (repas, douleurs, clé API) dans un fichier JSON.</p>
+        </div>
         <div style={{display:"flex",gap:12,marginTop:20}}>
           <button onClick={()=>setShowSettings(false)} style={{flex:1,borderRadius:16,padding:14,fontWeight:600,fontSize:14,background:"#F0E6D8",color:"#8D6E4C",border:"none",cursor:"pointer",fontFamily:"inherit"}}>{getApiKey()?"Annuler":"Passer"}</button>
           <button onClick={()=>{setApiKeyStore(apiKeyInput.trim());setShowSettings(false)}} disabled={!apiKeyInput.trim()} style={{flex:1,borderRadius:16,padding:14,fontWeight:600,fontSize:14,background:apiKeyInput.trim()?"#81B29A":"#D8D0C8",color:"#fff",border:"none",cursor:"pointer",fontFamily:"inherit"}}>Enregistrer</button>
+        </div>
+      </div></div>}
+
+      {showBackupNotice && <div className="gf-modal-backdrop"><div className="gf-modal-bg"/><div className="gf-modal" onClick={e=>e.stopPropagation()}>
+        <div className="gf-modal-handle"/>
+        <h2 style={{fontFamily:"Sora",fontWeight:700,textAlign:"center",fontSize:18,marginBottom:4}}>🎉 Nouveauté v0.10.0</h2>
+        <p style={{textAlign:"center",fontSize:12,marginBottom:20,color:"#8D99AE"}}>Sauvegarde tes données</p>
+        <div style={{padding:"0 16px",fontSize:13,lineHeight:1.5,color:"#5C5470"}}>
+          <p style={{marginBottom:12}}>Tu peux maintenant <strong>exporter et importer</strong> toutes tes données (repas, douleurs, clé API) depuis le panneau <strong>⚙️ Configuration</strong>.</p>
+          <p style={{marginBottom:0}}>Pense à faire un export de temps en temps — ça te servira de filet de sécurité si une future mise à jour vers la v1 ne se passe pas bien.</p>
+        </div>
+        <div style={{display:"flex",gap:12,marginTop:20}}>
+          <button onClick={()=>{localStorage.setItem(NOTICE_KEY_V010,"1");setShowBackupNotice(false)}} style={{flex:1,borderRadius:16,padding:14,fontWeight:600,fontSize:14,background:"#F0E6D8",color:"#8D6E4C",border:"none",cursor:"pointer",fontFamily:"inherit"}}>Plus tard</button>
+          <button onClick={()=>{localStorage.setItem(NOTICE_KEY_V010,"1");setShowBackupNotice(false);setShowSettings(true)}} style={{flex:1,borderRadius:16,padding:14,fontWeight:600,fontSize:14,background:"#81B29A",color:"#fff",border:"none",cursor:"pointer",fontFamily:"inherit"}}>Exporter maintenant</button>
         </div>
       </div></div>}
     </div>
