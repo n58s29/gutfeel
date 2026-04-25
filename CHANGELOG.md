@@ -1,5 +1,13 @@
 # Changelog — GutFeel
 
+## v0.10.0 — 25 avril 2026
+
+### Nouveau
+- **Export / Import des données** : depuis le panneau Configuration (⚙️), deux nouveaux boutons permettent d'exporter toutes les données de l'app (repas, douleurs, clé API, drapeaux de migration) dans un fichier JSON daté, et de les ré-importer à volonté. Utile pour : backup avant migration vers une future v1, transfert d'un appareil à un autre, ou rollback en cas de bug. Le fichier suit le format `{ app, version, exportedAt, data }` pour faciliter les futures migrations. À l'import, la version du backup est comparée à celle de l'app (rejet si plus récent, warning si plus ancien, confirmation si version absente) et les flags de migration sont restaurés tels quels — donc les migrations existantes se rejouent automatiquement au reload si nécessaire. L'export CSV existant (Journal) reste disponible et n'est pas touché.
+- **Popup d'annonce one-shot** au premier chargement post-MAJ : les utilisateurs existants (au moins une entrée en localStorage) voient une notice "🎉 Nouveauté v0.10.0" qui leur explique la feature et propose un raccourci direct vers le panneau Configuration. La popup ne s'affiche qu'une seule fois (flag `mieuxdemain-notice-v0.10.0-backup`). Les nouveaux utilisateurs (localStorage vide) ne la voient pas.
+
+---
+
 ## v0.9.6 — 25 avril 2026
 
 ### Corrections

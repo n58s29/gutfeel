@@ -14,7 +14,7 @@ Le projet est organisé par version majeure pour permettre des refontes complèt
 
 ```
 gutfeel/
-├── v0/                   ← Version actuellement déployée (série v0.x, dernière : v0.9.6)
+├── v0/                   ← Version actuellement déployée (série v0.x, dernière : v0.10.0)
 │   ├── src/
 │   ├── index.html
 │   ├── package.json
@@ -55,7 +55,7 @@ Pour la doc complète (config API, stack technique, fonctionnalités), voir [`v0
 
 ## 📋 Versions
 
-- **v0.9.6** (avril 2026) — version actuelle en prod, voir [`CHANGELOG.md`](CHANGELOG.md)
+- **v0.10.0** (avril 2026) — version actuelle en prod, voir [`CHANGELOG.md`](CHANGELOG.md)
 - **v1** — en cours de design, refonte complète à venir
 
 ---
