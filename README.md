@@ -2,81 +2,64 @@
 
 **Tracker alimentaire vocal pour identifier les intolérances.**
 
-Enregistre tout ce que tu manges (voix ou scan code-barres), décompose les ingrédients via IA, et note tes douleurs pour trouver le coupable.
+Enregistre tout ce que tu manges (voix, photo, scan code-barres), décompose les ingrédients via IA, note tes douleurs, et identifie les ingrédients suspects par corrélation.
 
-## 🚀 Déploiement sur GitHub Pages (5 minutes)
+🌐 **App live** : https://n58s29.github.io/gutfeel/
 
-### Étape 1 — Créer le repo GitHub
+---
 
-1. Va sur [github.com/new](https://github.com/new)
-2. Nom du repo : `gutfeel`
-3. Visibilité : **Public** (nécessaire pour GitHub Pages gratuit)
-4. **NE PAS** cocher "Add a README" (on en a déjà un)
-5. Clique **Create repository**
+## 📁 Structure du repo
 
-### Étape 2 — Pousser le code
+Le projet est organisé par version majeure pour permettre des refontes complètes sans casser l'existant.
 
-Ouvre un terminal dans le dossier `gutfeel-project` et tape :
-
-```bash
-git init
-git add .
-git commit -m "🫶 GutFeel v1"
-git branch -M main
-git remote add origin https://github.com/TON-USERNAME/gutfeel.git
-git push -u origin main
+```
+gutfeel/
+├── v0/                   ← Version actuellement déployée (série v0.x, dernière : v0.9.6)
+│   ├── src/
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   └── README.md         ← Doc spécifique v0 (stack, dev, déploiement)
+│
+├── v1/                   ← (à venir) refonte v1, en cours de design
+│
+├── CHANGELOG.md          ← Historique des versions (toutes versions confondues)
+├── TICKETS.md            ← Suivi des tickets ouverts
+└── .github/workflows/    ← CI/CD (build & deploy de la version active)
 ```
 
-> ⚠️ Remplace `TON-USERNAME` par ton pseudo GitHub !
+### Quelle version travailler ?
 
-### Étape 3 — Activer GitHub Pages
+- **Pour modifier l'app actuellement en prod** → bosse dans `v0/`
+- **Pour la prochaine refonte** → ce sera `v1/` (créé quand le design sera prêt)
 
-1. Va dans **Settings** de ton repo (onglet en haut)
-2. Menu gauche → **Pages**
-3. Source → sélectionne **GitHub Actions**
-4. C'est tout ! Le workflow se déclenche automatiquement au push
+### Quelle version est déployée ?
 
-### Étape 4 — Attendre le déploiement
+Le workflow `.github/workflows/deploy.yml` build et déploie le dossier `v0/` sur GitHub Pages. Quand `v1/` sera prêt, on basculera le workflow pour pointer vers `v1/`.
 
-1. Va dans l'onglet **Actions** de ton repo
-2. Tu verras le workflow "Deploy to GitHub Pages" en cours
-3. Attends 1-2 minutes qu'il passe au vert ✅
-4. Ton app est live sur : `https://TON-USERNAME.github.io/gutfeel/`
+---
 
-## 📱 Utilisation
-
-1. Ouvre l'URL sur ton **téléphone** (Chrome Android recommandé)
-2. Au premier lancement, entre ta **clé API Anthropic** (⚙️ Settings)
-   - Obtiens-en une sur [console.anthropic.com](https://console.anthropic.com/settings/keys)
-   - Elle reste stockée localement dans ton navigateur
-3. **Enregistre un repas** : appuie sur le micro, parle, vérifie, valide
-4. **Scanne un produit** : code-barres via caméra ou saisie manuelle
-5. **Note une douleur** : bouton "Aïe !" avec 3 niveaux d'intensité
-6. **Consulte et édite** : l'onglet Journal affiche tout l'historique — clique sur une entrée pour la copier, la modifier ou la supprimer
-7. **Comprends l'analyse** : dans l'onglet Analyse, le bouton "💡 Comment ça marche ?" explique la logique de corrélation, les badges de suspicion et la vue FODMAP
-
-## 🏗️ Stack technique
-
-- **React 18** + **Vite** (build ultra-rapide)
-- **Web Speech API** (reconnaissance vocale gratuite, navigateur)
-- **BarcodeDetector API** (scan code-barres natif Chrome)
-- **Claude Sonnet** (décomposition des ingrédients)
-- **OpenFoodFacts API** (lookup produits par code-barres)
-- **localStorage** (stockage données dans le navigateur)
-
-## 🔧 Dev local
+## 🚀 Démarrage rapide
 
 ```bash
+cd v0
 npm install
 npm run dev
 ```
 
-Ouvre `http://localhost:5173/gutfeel/` dans Chrome.
+Puis ouvre `http://localhost:5173/gutfeel/` dans Chrome.
 
-## ⚠️ Notes
+Pour la doc complète (config API, stack technique, fonctionnalités), voir [`v0/README.md`](v0/README.md).
 
-- Le scan code-barres natif fonctionne sur **Chrome Android/Desktop**. Sur iOS, utilise la saisie manuelle.
-- La reconnaissance vocale nécessite **Chrome** (Web Speech API).
-- La clé API est stockée uniquement dans ton navigateur, jamais transmise ailleurs que l'API Anthropic.
-- Le bouton Retour Android fonctionne naturellement : il ferme l'écran actif (enregistrement, modification, paramètres…) sans quitter l'app.
-- Les ingrédients sont toujours en français : via `lc=fr` sur Open Food Facts, la priorité aux champs `_fr`, la traduction automatique des anglicismes résiduels, et les consignes strictes dans les prompts Claude.
+---
+
+## 📋 Versions
+
+- **v0.9.6** (avril 2026) — version actuelle en prod, voir [`CHANGELOG.md`](CHANGELOG.md)
+- **v1** — en cours de design, refonte complète à venir
+
+---
+
+## 🛠 Stack actuelle (v0)
+
+React 18 + Vite, Web Speech API, BarcodeDetector API, Claude Sonnet (analyse), OpenFoodFacts (lookup produits), localStorage. Pas de backend.
