@@ -1,5 +1,44 @@
 # Changelog — GutFeel
 
+## v1.0.0 — 2 mai 2026
+
+### Refonte complète de l'interface
+
+Première version majeure : **redesign visuel intégral** de l'application sans aucun changement de fonctionnalités. Toutes les features de la série v0.x sont préservées (vocal, texte, photo, étiquette, code-barres, Aïe!, analyse FODMAP, export/import JSON, export CSV, clé API, à propos), juste habillées d'un nouveau design system.
+
+### Nouveau design "Calme et minimal"
+
+- **Direction visuelle** repensée pour réduire la charge cognitive : palette **sage green** (#52634c primary), beaucoup de whitespace, micro-shadows à la place d'élévations marquées, radii doux (16px boutons / 24px cards).
+- **Typographie** : passage à **Plus Jakarta Sans** (Google Fonts) avec une scale documentée (headline-lg/md, body-lg/md, label-md/sm).
+- **Design system** : fichier [`v1/src/theme.css`](v1/src/theme.css) avec ~50 variables CSS dérivées du `DESIGN.md` (couleurs Material You, typo, spacing 8px-base, severity badges).
+- **Idéation** réalisée avec Google Stitch, direction "Calme et minimal" sur 5 écrans clés (Home, Vocal, Journal, Analyse, Settings).
+
+### Architecture
+
+- **Refactor multi-fichiers** : `v0/src/App.jsx` était un single-file de 1300+ lignes. La v1 le découpe en ~20 fichiers organisés par feature (`components/Home/`, `components/Journal/`, `components/Analysis/`, `components/Settings/`, `components/Capture/`, `components/Pain/`, `components/MealEditor/`, `components/Onboarding/` + `lib/`).
+- **Pas de sur-extraction** : pas de `<Button>` ou `<Card>` atomiques, juste des classes CSS du theme. Évite la prematurité.
+- **lib/ réutilisable** : api.js (Anthropic + Open Food Facts), backup.js (export/import JSON), csv.js, storage.js (localStorage), migrations.js, correlation.js, fodmapDictionary.js, foodNormalizer.js, symptomTypes.js, bristolScale.js, utils.js, categories.js.
+
+### Migration des données
+
+- **Zéro perte par construction.** localStorage est scoped à l'origine (`n58s29.github.io`) — v0 et v1 partagent automatiquement les mêmes données. La bascule du workflow GH Pages de `v0/` vers `v1/` ne touche pas le store. Au reload, le user voit la nouvelle UI avec ses données intactes.
+- Schémas `mieuxdemain-*` identiques à v0.10.0 — l'export JSON v0.10.0 est nativement importable en v1 et inversement.
+- Les 3 migrations v0 (food normalize / barcode cats / re-normalize) sont **portées verbatim** dans `v1/src/lib/migrations.js`. Un user qui arriverait depuis une vieille v0.5 sera correctement migré.
+
+### Onboarding
+
+- **Popup one-shot "Bienvenue dans la v1"** au premier chargement post-MAJ pour les utilisateurs existants (au moins une entrée). Flag `mieuxdemain-notice-v1.0.0-redesign`. Ne s'affiche pas pour les nouveaux installs.
+
+### Conservé tel quel (rien à signaler côté feature)
+
+- Web Speech API pour le vocal (français), BarcodeDetector pour le scan, OpenFoodFacts pour la lookup produits, Claude Sonnet 4 pour l'analyse vocal/texte/photo/étiquette.
+- Migrations idempotentes via flags localStorage.
+- Triple verrou français sur les ingrédients (Open Food Facts `lc=fr` + normalisation côté code + prompts Claude stricts).
+- Export CSV journal disponible dans Paramètres.
+- Export/Import JSON avec validation semver à l'import (rejet si backup plus récent que l'app, warning si plus ancien).
+
+---
+
 ## v0.10.0 — 25 avril 2026
 
 ### Nouveau

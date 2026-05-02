@@ -14,14 +14,17 @@ Le projet est organisé par version majeure pour permettre des refontes complèt
 
 ```
 gutfeel/
-├── v0/                   ← Version actuellement déployée (série v0.x, dernière : v0.10.0)
+├── v1/                   ← Version actuellement déployée (v1.0.0 — refonte complète)
 │   ├── src/
+│   │   ├── components/   ← Home, Journal, Analysis, Settings, Capture, Pain, MealEditor, Onboarding
+│   │   ├── lib/          ← api, storage, migrations, correlation, fodmapDictionary…
+│   │   └── theme.css     ← Design system "Calme et minimal" (variables CSS)
 │   ├── index.html
 │   ├── package.json
 │   ├── vite.config.js
-│   └── README.md         ← Doc spécifique v0 (stack, dev, déploiement)
+│   └── README.md
 │
-├── v1/                   ← (à venir) refonte v1, en cours de design
+├── v0/                   ← Archive — série v0.x (dernière v0.10.0). Conservé en filet de sécurité.
 │
 ├── CHANGELOG.md          ← Historique des versions (toutes versions confondues)
 ├── TICKETS.md            ← Suivi des tickets ouverts
@@ -30,12 +33,12 @@ gutfeel/
 
 ### Quelle version travailler ?
 
-- **Pour modifier l'app actuellement en prod** → bosse dans `v0/`
-- **Pour la prochaine refonte** → ce sera `v1/` (créé quand le design sera prêt)
+- **Pour modifier l'app en prod** → bosse dans `v1/`
+- **v0/** reste dans le repo pour rollback éventuel mais n'est plus la version active
 
 ### Quelle version est déployée ?
 
-Le workflow `.github/workflows/deploy.yml` build et déploie le dossier `v0/` sur GitHub Pages. Quand `v1/` sera prêt, on basculera le workflow pour pointer vers `v1/`.
+Le workflow `.github/workflows/deploy.yml` build et déploie le dossier `v1/` sur GitHub Pages.
 
 ---
 
@@ -55,11 +58,11 @@ Pour la doc complète (config API, stack technique, fonctionnalités), voir [`v0
 
 ## 📋 Versions
 
-- **v0.10.0** (avril 2026) — version actuelle en prod, voir [`CHANGELOG.md`](CHANGELOG.md)
-- **v1** — en cours de design, refonte complète à venir
+- **v1.0.0** (mai 2026) — version actuelle en prod, refonte visuelle complète. Voir [`CHANGELOG.md`](CHANGELOG.md)
+- **v0.10.0** (avril 2026) — dernière de la série v0.x, archivée dans `v0/`
 
 ---
 
-## 🛠 Stack actuelle (v0)
+## 🛠 Stack actuelle (v1)
 
-React 18 + Vite, Web Speech API, BarcodeDetector API, Claude Sonnet (analyse), OpenFoodFacts (lookup produits), localStorage. Pas de backend.
+React 18 + Vite, Plus Jakarta Sans (Google Fonts), Web Speech API, BarcodeDetector API, Claude Sonnet (analyse), OpenFoodFacts (lookup produits), localStorage. Pas de backend. Design system documenté dans `v1/src/theme.css` (variables CSS dérivées de `DESIGN.md`).

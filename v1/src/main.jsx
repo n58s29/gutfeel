@@ -1,0 +1,10 @@
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import MieuxDemain from './App.jsx'
+import './theme.css'
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <MieuxDemain />
+  </React.StrictMode>,
+)
