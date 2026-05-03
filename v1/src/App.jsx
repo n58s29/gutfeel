@@ -12,6 +12,7 @@ import VoiceCapture from "./components/Capture/VoiceCapture.jsx";
 import TextCapture from "./components/Capture/TextCapture.jsx";
 import PhotoCapture from "./components/Capture/PhotoCapture.jsx";
 import BarcodeCapture from "./components/Capture/BarcodeCapture.jsx";
+import QuickActionsSheet from "./components/Capture/QuickActionsSheet.jsx";
 import WelcomeNoticeV1 from "./components/Onboarding/WelcomeNoticeV1.jsx";
 
 const NOTICE_KEY_V1 = "mieuxdemain-notice-v1.0.0-redesign";
@@ -27,6 +28,7 @@ export default function MieuxDemain() {
   const [painState, setPainState] = useState(null);   // null | { mode, initialEntry? }
   const [mealEditorState, setMealEditorState] = useState(null); // null | { mode, ... }
   const [captureMethod, setCaptureMethod] = useState(null); // null | "voice" | "text" | ...
+  const [showQuickActions, setShowQuickActions] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
@@ -165,7 +167,7 @@ export default function MieuxDemain() {
   const handlePain = () => setPainState({ mode: "create" });
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-tab={tab}>
       <header className="app-header">
         <div className="app-logo">Mieux Demain</div>
         <button className="app-icon-btn" aria-label="Paramètres" onClick={() => setShowSettings(true)}>
@@ -185,8 +187,7 @@ export default function MieuxDemain() {
         {tab === "journal" && (
           <JournalScreen
             entries={entries}
-            onCapture={handleCapture}
-            onPain={handlePain}
+            onShowQuickActions={() => setShowQuickActions(true)}
             onEditEntry={handleEditEntry}
             onDuplicateEntry={handleDuplicateEntry}
             onDeleteEntry={handleDeleteEntry}
@@ -261,6 +262,14 @@ export default function MieuxDemain() {
         <BarcodeCapture
           onSave={handleBarcodeSave}
           onCancel={() => setCaptureMethod(null)}
+        />
+      )}
+
+      {showQuickActions && (
+        <QuickActionsSheet
+          onClose={() => setShowQuickActions(false)}
+          onCapture={(method) => { setShowQuickActions(false); handleCapture(method); }}
+          onPain={() => { setShowQuickActions(false); handlePain(); }}
         />
       )}
 

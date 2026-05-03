@@ -179,6 +179,39 @@ a { color: var(--color-primary); }
   background: var(--color-background);
 }
 
+/* Per-tab faded background photo (sits behind all content). */
+.app-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 0.3s ease;
+}
+.app-shell[data-tab="home"]::before {
+  background-image: url('/backgrounds/home.webp');
+  opacity: 0.25;
+}
+.app-shell[data-tab="journal"]::before {
+  background-image: url('/backgrounds/journal.webp');
+  opacity: 0.25;
+}
+.app-shell[data-tab="analysis"]::before {
+  background-image: url('/backgrounds/analysis.webp');
+  opacity: 0.25;
+}
+
+/* Make sure header / scroll / tabbar stay above the bg photo. */
+.app-header,
+.app-scroll {
+  position: relative;
+  z-index: 1;
+}
+
 .app-header {
   display: flex;
   align-items: center;
@@ -348,20 +381,24 @@ a { color: var(--color-primary); }
   inset: 0;
   background: rgba(24, 28, 28, 0.4);
   z-index: 100;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
   animation: fade-in 0.2s ease;
 }
 .modal-sheet {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
   width: 100%;
   max-width: 480px;
   background: var(--color-surface-container-lowest);
   border-top-left-radius: var(--radius-2xl);
   border-top-right-radius: var(--radius-2xl);
   padding: 16px var(--space-container) calc(var(--space-container) + var(--space-safe-bottom));
-  max-height: 90vh;
+  max-height: 92dvh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   animation: slide-up 0.25s ease;
 }
 .modal-handle {
