@@ -744,6 +744,33 @@ a { color: var(--color-primary); }
 }
 .analysis-empty-emoji { font-size: 48px; margin-bottom: 16px; }
 
+.analysis-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-container-low);
+  border-left: 3px solid var(--color-primary);
+}
+.analysis-banner-label {
+  font-size: var(--font-label-sm-size);
+  font-weight: 600;
+  letter-spacing: var(--font-label-sm-tracking);
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+.analysis-banner-title {
+  font-size: var(--font-body-md-size);
+  font-weight: 500;
+  color: var(--color-on-surface);
+}
+.analysis-banner-meta {
+  font-size: var(--font-label-md-size);
+  color: var(--color-on-surface-variant);
+}
+
 .overview-card {
   display: flex;
   flex-direction: column;

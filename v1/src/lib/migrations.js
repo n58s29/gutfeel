@@ -3,12 +3,13 @@
 // re-run automatically. v1 ships no new migrations of its own — all
 // localStorage schemas remain identical to v0.
 
-import { loadEntries, persistEntries, setFlag, getFlag } from "./storage.js";
+import { loadEntries, persistEntries, setFlag, getFlag, loadAnalyses, persistAnalyses } from "./storage.js";
 import { normalizeIngredients, normalizeIngredientName, guessCategory } from "./foodNormalizer.js";
 
 const MIGRATION_KEY_V1 = "mieuxdemain-migration-v1-food-normalize";
 const MIGRATION_KEY_V2 = "mieuxdemain-migration-v2-barcode-cats";
 const MIGRATION_KEY_V3 = "mieuxdemain-migration-v3-renormalize";
+const MIGRATION_KEY_V4 = "mieuxdemain-migration-v4-seed-initial-analysis";
 
 // Carried over from v0/App.jsx mount useEffect — kept in same order, same flags.
 export function runMigrations() {
@@ -72,5 +73,30 @@ export function runMigrations() {
       persistEntries(migrated);
     } catch {}
     setFlag(MIGRATION_KEY_V3);
+  }
+
+  // v4 — seed an initial analysis covering existing data, so the new
+  // "analyse en cours" filter has something to work with. startDate is
+  // backdated to the oldest entry (or now, if there are none yet) so
+  // pre-existing users see their full history analysed exactly as before.
+  if (!getFlag(MIGRATION_KEY_V4)) {
+    try {
+      if (loadAnalyses().length === 0) {
+        const entries = loadEntries();
+        const oldest = entries.reduce((min, e) => {
+          const t = new Date(e.timestamp).getTime();
+          return Number.isFinite(t) && (min === null || t < min) ? t : min;
+        }, null);
+        const startDate = oldest !== null
+          ? new Date(oldest).toISOString()
+          : new Date().toISOString();
+        persistAnalyses([{
+          id: "an_initial",
+          label: "Analyse initiale",
+          startDate,
+        }]);
+      }
+    } catch {}
+    setFlag(MIGRATION_KEY_V4);
   }
 }

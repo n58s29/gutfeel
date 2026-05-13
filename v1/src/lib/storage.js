@@ -3,6 +3,7 @@
 
 export const STORAGE_KEY = "mieuxdemain-entries";
 export const APIKEY_KEY = "mieuxdemain-apikey";
+export const ANALYSES_KEY = "mieuxdemain-analyses";
 export const STORAGE_PREFIX = "mieuxdemain-";
 
 export function loadEntries() {
@@ -20,6 +21,55 @@ export function getApiKey() {
 
 export function setApiKey(key) {
   localStorage.setItem(APIKEY_KEY, key);
+}
+
+// ── Analyses (named tracking periods) ─────────────────────────
+// Stored as an array of { id, label, startDate, endedAt? }.
+// The current analysis is the entry without `endedAt`; there is
+// always exactly one current after the v4 migration has run.
+
+export function loadAnalyses() {
+  try { return JSON.parse(localStorage.getItem(ANALYSES_KEY) || "[]"); }
+  catch { return []; }
+}
+
+export function persistAnalyses(arr) {
+  try { localStorage.setItem(ANALYSES_KEY, JSON.stringify(arr)); } catch {}
+}
+
+export function getCurrentAnalysis() {
+  const all = loadAnalyses();
+  return all.find(a => !a.endedAt) || null;
+}
+
+function genAnalysisId() {
+  return "an_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+// Archives the current analysis (sets endedAt = now) and pushes a
+// new one starting now with the given label (or a date-based fallback).
+// Returns the new current analysis.
+export function startNewAnalysis(label) {
+  const now = new Date().toISOString();
+  const all = loadAnalyses();
+  const archived = all.map(a => a.endedAt ? a : { ...a, endedAt: now });
+  const next = {
+    id: genAnalysisId(),
+    label: (label || "").trim() || defaultAnalysisLabel(now),
+    startDate: now,
+  };
+  const updated = [...archived, next];
+  persistAnalyses(updated);
+  return next;
+}
+
+export function defaultAnalysisLabel(iso) {
+  try {
+    const d = new Date(iso);
+    return "Analyse du " + d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  } catch {
+    return "Analyse";
+  }
 }
 
 export function getFlag(key) {

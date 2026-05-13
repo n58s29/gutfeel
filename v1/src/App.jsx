@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Settings, Home as HomeIcon, BookOpen, BarChart3 } from "lucide-react";
 import { runMigrations } from "./lib/migrations.js";
-import { loadEntries, persistEntries } from "./lib/storage.js";
+import { loadEntries, persistEntries, getCurrentAnalysis, startNewAnalysis } from "./lib/storage.js";
 import HomeScreen from "./components/Home/HomeScreen.jsx";
 import JournalScreen from "./components/Journal/JournalScreen.jsx";
 import AnalysisScreen from "./components/Analysis/AnalysisScreen.jsx";
@@ -24,6 +24,7 @@ function genId() {
 export default function MieuxDemain() {
   const [tab, setTab] = useState("home");
   const [entries, setEntries] = useState([]);
+  const [currentAnalysis, setCurrentAnalysis] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [painState, setPainState] = useState(null);   // null | { mode, initialEntry? }
   const [mealEditorState, setMealEditorState] = useState(null); // null | { mode, ... }
@@ -35,12 +36,17 @@ export default function MieuxDemain() {
     runMigrations();
     const loaded = loadEntries();
     setEntries(loaded);
+    setCurrentAnalysis(getCurrentAnalysis());
     // Show v1.0.0 redesign notice once for existing users (≥1 entry).
     // Skip for fresh installs to avoid bothering brand-new users.
     if (loaded.length > 0 && !localStorage.getItem(NOTICE_KEY_V1)) {
       setShowWelcome(true);
     }
   }, []);
+
+  function handleStartNewAnalysis(label) {
+    setCurrentAnalysis(startNewAnalysis(label));
+  }
 
   function dismissWelcome() {
     localStorage.setItem(NOTICE_KEY_V1, "1");
@@ -193,7 +199,7 @@ export default function MieuxDemain() {
             onDeleteEntry={handleDeleteEntry}
           />
         )}
-        {tab === "analysis" && <AnalysisScreen entries={entries} />}
+        {tab === "analysis" && <AnalysisScreen entries={entries} currentAnalysis={currentAnalysis} />}
       </main>
 
       <nav className="tabbar">
@@ -205,6 +211,8 @@ export default function MieuxDemain() {
       {showSettings && (
         <SettingsModal
           entries={entries}
+          currentAnalysis={currentAnalysis}
+          onStartNewAnalysis={handleStartNewAnalysis}
           onClose={() => setShowSettings(false)}
         />
       )}

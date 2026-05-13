@@ -63,12 +63,25 @@ function computeCorrelationRate(entries, suspectNames) {
   return count / painEntries.length;
 }
 
-export default function AnalysisScreen({ entries }) {
+export default function AnalysisScreen({ entries, currentAnalysis }) {
   const [showHow, setShowHow] = useState(false);
-  const data = useMemo(() => analyzeCorrelations(entries, { lookbackHours: LOOKBACK_HOURS }), [entries]);
 
-  if (entries.length === 0) {
+  // Only entries from the current analysis period feed the correlation engine.
+  // Pre-existing data stays visible in the Journal but is excluded here so a
+  // new investigation isn't polluted by an older one (cf. v4 migration).
+  const scopedEntries = useMemo(() => {
+    if (!currentAnalysis?.startDate) return entries;
+    const start = new Date(currentAnalysis.startDate).getTime();
+    return entries.filter(e => new Date(e.timestamp).getTime() >= start);
+  }, [entries, currentAnalysis]);
+
+  const data = useMemo(() => analyzeCorrelations(scopedEntries, { lookbackHours: LOOKBACK_HOURS }), [scopedEntries]);
+
+  const banner = currentAnalysis ? <AnalysisBanner analysis={currentAnalysis} /> : null;
+
+  if (scopedEntries.length === 0) {
     return <EmptyState
+      banner={banner}
       emoji="🌱"
       title="Aucune donnée"
       subtitle="Commence par enregistrer un repas et un symptôme. L'analyse arrivera quand tu auras assez de données." />;
@@ -76,6 +89,7 @@ export default function AnalysisScreen({ entries }) {
 
   if (data.symptomCount < 3 || data.mealCount < 5) {
     return <EmptyState
+      banner={banner}
       emoji="📊"
       title="Continue, on y est presque"
       subtitle={`Il faut au moins 3 symptômes et 5 repas pour des corrélations fiables. Tu en es à ${data.symptomCount} symptôme${data.symptomCount>1?"s":""} et ${data.mealCount} repas.`} />;
@@ -83,13 +97,14 @@ export default function AnalysisScreen({ entries }) {
 
   if (data.ingredients.length === 0) {
     return <EmptyState
+      banner={banner}
       emoji="🤔"
       title="Aucun suspect identifié"
       subtitle="Aucun ingrédient ne revient régulièrement avant tes symptômes. Continue à noter, on finira par trouver." />;
   }
 
   // ── We have suspects. Compute summary + group by FODMAP ──
-  const correlationRate = computeCorrelationRate(entries, data.ingredients.map(i => i.name));
+  const correlationRate = computeCorrelationRate(scopedEntries, data.ingredients.map(i => i.name));
   const correlationPct = Math.round(correlationRate * 100);
   const sensitivityLabel =
     correlationRate > 0.6 ? "Sensibilité haute"
@@ -109,6 +124,8 @@ export default function AnalysisScreen({ entries }) {
       <p className="body-md text-muted" style={{ marginTop: 4 }}>
         Identification des ingrédients suspects basée sur les {LOOKBACK_HOURS} dernières heures avant chaque symptôme.
       </p>
+
+      {banner}
 
       {/* Vue d'ensemble */}
       <div className="card overview-card" style={{ marginTop: 24 }}>
@@ -166,10 +183,23 @@ function SuspectRow({ ingredient }) {
   );
 }
 
-function EmptyState({ emoji, title, subtitle }) {
+function AnalysisBanner({ analysis }) {
+  const start = new Date(analysis.startDate);
+  const formatted = start.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  return (
+    <div className="analysis-banner">
+      <span className="analysis-banner-label">Analyse en cours</span>
+      <span className="analysis-banner-title">« {analysis.label} »</span>
+      <span className="analysis-banner-meta">depuis le {formatted}</span>
+    </div>
+  );
+}
+
+function EmptyState({ banner, emoji, title, subtitle }) {
   return (
     <div className="analysis-screen">
       <h1 className="headline-lg">Analyse digestive</h1>
+      {banner}
       <div className="analysis-empty">
         <div className="analysis-empty-emoji">{emoji}</div>
         <p className="headline-md" style={{ color: "var(--color-on-surface-variant)" }}>{title}</p>

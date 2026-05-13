@@ -1,16 +1,24 @@
-import { useState, useRef } from "react";
-import { X, Key, Download, Upload, FileText, ShieldCheck, ExternalLink, ChevronRight } from "lucide-react";
+import { useState, useRef, useMemo } from "react";
+import { X, Key, Download, Upload, FileText, ShieldCheck, ExternalLink, ChevronRight, RotateCcw } from "lucide-react";
 import pkg from "../../../package.json";
 import { getApiKey, setApiKey } from "../../lib/storage.js";
 import { exportBackup, importBackup } from "../../lib/backup.js";
 import { exportCSV } from "../../lib/csv.js";
 import AboutSheet from "./AboutSheet.jsx";
+import NewAnalysisSheet from "./NewAnalysisSheet.jsx";
 
-export default function SettingsModal({ entries, onClose }) {
+export default function SettingsModal({ entries, currentAnalysis, onStartNewAnalysis, onClose }) {
   const [apiKeyInput, setApiKeyInput] = useState(getApiKey());
   const [error, setError] = useState(null);
   const [showAbout, setShowAbout] = useState(false);
+  const [showNewAnalysis, setShowNewAnalysis] = useState(false);
   const fileInputRef = useRef(null);
+
+  const scopedCount = useMemo(() => {
+    if (!currentAnalysis?.startDate) return 0;
+    const start = new Date(currentAnalysis.startDate).getTime();
+    return entries.filter(e => new Date(e.timestamp).getTime() >= start).length;
+  }, [entries, currentAnalysis]);
 
   const handleSave = () => {
     setApiKey(apiKeyInput.trim());
@@ -71,6 +79,25 @@ export default function SettingsModal({ entries, onClose }) {
         >
           <ExternalLink size={14} /> Obtenir une clé API
         </a>
+
+        {/* ── Current analysis ──────────────────────── */}
+        {currentAnalysis && (
+          <>
+            <p className="section-label">Analyse en cours</p>
+            <div className="settings-actions">
+              <button className="settings-action-row" onClick={() => setShowNewAnalysis(true)}>
+                <span className="settings-action-icon"><RotateCcw size={18} /></span>
+                <div className="settings-action-text">
+                  <div className="settings-action-title">Démarrer une nouvelle analyse</div>
+                  <div className="settings-action-sub">
+                    « {currentAnalysis.label} » — {scopedCount} entrée{scopedCount > 1 ? "s" : ""} seront archivées
+                  </div>
+                </div>
+                <ChevronRight size={18} className="text-muted" />
+              </button>
+            </div>
+          </>
+        )}
 
         {/* ── Data management ───────────────────────── */}
         <p className="section-label">Gestion des données</p>
@@ -150,6 +177,17 @@ export default function SettingsModal({ entries, onClose }) {
         </div>
 
         {showAbout && <AboutSheet onClose={() => setShowAbout(false)} />}
+        {showNewAnalysis && (
+          <NewAnalysisSheet
+            currentLabel={currentAnalysis?.label}
+            entryCount={scopedCount}
+            onConfirm={(label) => {
+              onStartNewAnalysis(label);
+              setShowNewAnalysis(false);
+            }}
+            onCancel={() => setShowNewAnalysis(false)}
+          />
+        )}
       </div>
     </div>
   );
