@@ -10,7 +10,7 @@ const ANTHROPIC_HEADERS = (apiKey) => ({
   "anthropic-version": "2023-06-01",
   "anthropic-dangerous-direct-browser-access": "true",
 });
-const MODEL = "claude-sonnet-4-20250514";
+const MODEL = "claude-sonnet-4-6";
 
 // ──────────────────────────────────────────────────────────────────
 // Errors
