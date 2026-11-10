@@ -24,15 +24,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Install dependencies (v1)
+      - name: Install dependencies (v2)
         run: npm install
-        working-directory: ./v1
-      - name: Build (v1)
+        working-directory: ./v2
+      - name: Build (v2)
         run: npm run build
-        working-directory: ./v1
+        working-directory: ./v2
       - uses: actions/configure-pages@v4
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: './v1/dist'
+          path: './v2/dist'
       - id: deployment
         uses: actions/deploy-pages@v4
