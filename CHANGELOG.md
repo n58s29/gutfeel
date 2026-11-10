@@ -1,5 +1,40 @@
 # Changelog — GutFeel
 
+## v2.0.0 — novembre 2026
+
+### Plus de clé API à saisir : code famille + relais sécurisé
+
+- L'app n'appelle plus Anthropic directement. Les requêtes passent par un **Cloudflare Worker** ([`cloudflare-worker/worker.js`](cloudflare-worker/worker.js)) qui garde la clé API en secret côté serveur et vérifie un **code famille**.
+- Écran « Code famille » au démarrage (une seule fois par téléphone) et champ dédié dans ⚙️ Paramètres, avec vérification auprès du relais.
+- Le relais impose le modèle (`claude-sonnet-5-5`), plafonne `max_tokens` et n'accepte que les origines autorisées.
+- Migration v5 : suppression des anciennes clés API (`mieuxdemain-apikey`, `gutfeel-apikey`) du stockage local.
+- Le code famille n'est ni exporté dans le backup JSON ni écrasé par un import.
+- L'adresse du relais se règle dans [`v2/src/config.js`](v2/src/config.js).
+
+### Découpage repas → ingrédients
+
+- **Nouveau normaliseur commun** à toutes les sources (vocal, texte, photo, code-barres, saisie manuelle) : minuscules, `oe` → `œ`, suppression des pourcentages, quantités, articles et qualificatifs (cuisson, découpe, bio, couleur…), passage au singulier, correction des accents manquants. Ex. « Oignons rouges émincés » → `oignon`, « lait entier 12 % » → `lait`, « 2 oeufs » → `œuf`.
+- **Vocabulaire du journal transmis à l'IA** : elle réutilise exactement les noms déjà présents, ce qui évite les doublons d'un repas à l'autre.
+- **Réponses IA au format JSON garanti** (structured outputs) : fin des plantages sur JSON mal formé.
+- **Catégories corrigées** : comparaison par mots entiers, mot-clé le plus long prioritaire (`pomme de terre` n'est plus un fruit, `volaille` n'est plus un légume, `beurre de cacahuète` n'est plus un laitier). Même nom = même catégorie, quelle que soit la source.
+- **Dictionnaire FODMAP** : recherche via le même normaliseur (`œuf`, `bœuf`, pluriels reconnus) et en mots entiers.
+- **Code-barres** : sous-ingrédients conservés (« chocolat (sucre, cacao…) » → sucre, cacao…), filtre anti-texte parasite corrigé pour les mots accentués.
+- **« Rien mangé »** : ne court-circuite l'IA que si toute la phrase le dit (« rien de spécial, des pâtes » est maintenant analysé).
+- Migration v5 : renormalisation de tout l'historique avec les nouvelles règles. Seuls les noms et catégories d'ingrédients changent (douleurs, heures, plats, portions, transcriptions et analyses intacts).
+- **Copie de sécurité** des repas d'origine prise avant la migration (`mieuxdemain-snapshot-before-v2`, non exportée) ; si elle ne peut pas être écrite, la migration n'a pas lieu. Bouton ⚙️ Paramètres → « Ingrédients d'avant la v2 » pour revenir en arrière sans toucher aux nouveaux repas ni aux douleurs.
+
+### Analyse des douleurs (refonte de l'algorithme)
+
+- **Risque relatif** : fréquence des symptômes après les repas *avec* l'ingrédient comparée aux repas *sans*. Les ingrédients omniprésents (sel, huile…) ne ressortent plus.
+- **Épisodes** : saisies de douleur à moins de 2 h d'intervalle fusionnées ; un épisode compte une fois, même avec plusieurs symptômes cochés.
+- **Pondération du délai** : poids plein entre 30 min et 8 h, décroissant jusqu'à 24 h.
+- **Seuils et test statistique** : au moins 3 repas avec l'ingrédient, 2 épisodes liés et un écart significatif ; lissage pour les petits volumes.
+- **Vue d'ensemble corrigée** : le pourcentage ne porte plus que sur les vrais suspects (il était presque toujours à 100 % en v1).
+- Chaque suspect affiche son risque relatif, son nombre d'épisodes, le délai moyen et le symptôme principal. Groupe « Hors FODMAP » au lieu de « Ingrédients neutres / Sûrs ».
+- Texte « Comment ça marche ? » réécrit.
+
+---
+
 ## v1.0.0 — 2 mai 2026
 
 ### Refonte complète de l'interface
